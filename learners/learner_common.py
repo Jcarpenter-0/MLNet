@@ -8,7 +8,7 @@ import random
 
 class ReinforcementLearningCore(object):
 
-    def __init__(self, modelname, numberofactions, training=True, verbose=False, epochcount=16,epsilon=65,
+    def __init__(self, modelname, numberofactions, training=True, acting=True, verbose=False, epochcount=16,epsilon=65,
                  learningrate=0.001,lossfunction='mean_squared_error',modellayers=[]):
         """
         modelname:
@@ -27,6 +27,8 @@ class ReinforcementLearningCore(object):
         self.Description = ''
         self.InputFieldDescriptions = []
         self.OutputFieldDescriptions = []
+        # the literal text name to check for input to prune for testing and check for training
+        self.ActionIDFieldText = 'actionID'
 
         # Configurations ----------------------------------------------------------------------------------------------
         self.Verbose = verbose
@@ -39,10 +41,13 @@ class ReinforcementLearningCore(object):
         # Ensure folder creation
         os.makedirs(self.CoreFolder, exist_ok=True)
 
-        self.ModelTraceHeader = 'Timestamp,Reward,'
+        self.ModelTraceHeader = 'Timestamp,Reward'
 
         # Training flag
         self.Training = training
+
+        # Acting flag, will return actions when states provided
+        self.Acting = acting
 
         self.ModelLogFilePath = self.CoreFolder + '{}-report.json'.format(self.ModelName)
 
@@ -146,6 +151,8 @@ class ReinforcementLearningCore(object):
     def Describe(self):
 
         descriptionDict = {'Description': self.Description,
+                           'Training': self.Training,
+                           'TrainingAndActing': self.Acting,
                            'InputFieldDescriptions': self.InputFieldDescriptions,
                            'OutputFieldDescriptions': self.OutputFieldDescriptions}
 
@@ -153,6 +160,20 @@ class ReinforcementLearningCore(object):
 
     # Take in stateData (as a Python Dict), return a command structure (as a Python Dict)
     def Operate(self, stateData):
+
+        returnErrorBody = {'ActionID': -1}
+
+        if self.Training:
+            # Need the action ID field in data
+            if self.ActionIDFieldText not in stateData.keys():
+                returnErrorBody['comment'] = 'Need action ID field for training, see GET'
+                return returnErrorBody
+        else:
+            # remove action if present
+            if self.ActionIDFieldText in stateData.keys():
+                # remove it from the state
+                del stateData[self.ActionIDFieldText]
+
 
         # Calculate Reward Value
         reward = self.Reward(stateData)
@@ -175,15 +196,6 @@ class ReinforcementLearningCore(object):
         # write out all the state info collected by the RL
         logLine = '{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
 
-        # write out each of the state values
-        for value in stateData.values():
-            logLine += ',{}'.format(value)
-
-        traceFileDS.write('{}\n'.format(logLine))
-
-        traceFileDS.flush()
-        traceFileDS.close()
-
         # Get actions/commands
         actionID = -1
 
@@ -194,6 +206,19 @@ class ReinforcementLearningCore(object):
         else:
             # Take action
             actionID = self.Act(stateData)
+            stateData[self.ActionIDFieldText] = actionID
+
+        # potentially change the action based on hueristic or other types
+        actionID = self.ReturnAction(stateData, reward, actionID)
+
+        # write out each of the state values
+        for value in stateData.values():
+            logLine += ',{}'.format(value)
+
+        traceFileDS.write('{}\n'.format(logLine))
+
+        traceFileDS.flush()
+        traceFileDS.close()
 
         # Increment Common Metrics
         self.CurrentStep += 1
@@ -206,7 +231,7 @@ class ReinforcementLearningCore(object):
 
         expandedState = list(state.values())
 
-        properlyDimensionedState = np.array(expandedState, ndmin=len(expandedState)-1)
+        properlyDimensionedState = np.array(expandedState, ndmin=2)
 
         # Fit action to reward, so that given an action we can see the potential impact
         trainingResult = self.Model.fit(properlyDimensionedState, [reward], epochs=self.EpochCount, verbose=self.Verbose)
@@ -221,17 +246,19 @@ class ReinforcementLearningCore(object):
 
         # determine if agent will take random action, or if it will select the highest rewarding action
 
-        # Explore or Exploit
-        if random.randint(1,100) <= self.Epsilon:
-            # Explore
-            self.LastActionType = 0
-            # Pick a random action
-            selectedAction = random.randint(0,self.NumberOfActions-1)
+        selectedAction = -1
 
-        else:
-            # Exploit
-            self.LastActionType = 1
-            selectedAction = self.Act(state)
+        # Explore or Exploit, if acting
+        if self.Acting:
+            if random.randint(1,100) <= self.Epsilon:
+                # Explore
+                self.LastActionType = 0
+                # Pick a random action
+                selectedAction = random.randint(0,self.NumberOfActions-1)
+            else:
+                # Exploit
+                self.LastActionType = 1
+                selectedAction = self.Act(state)
 
         return selectedAction
 
@@ -243,13 +270,19 @@ class ReinforcementLearningCore(object):
         highestReward = -1
         highestRewardActionIndex = -1
 
+        statecopy = dict()
+
+        for key in state.keys():
+            statecopy[key] = state[key]
+
+        # Try different actions, see what reward they may make
         for actionIndex in range(0, self.NumberOfActions):
 
-            expandedState = list(state.values())
+            statecopy[self.ActionIDFieldText] = actionIndex
 
-            expandedState.append(actionIndex)
+            expandedState = list(statecopy.values())
 
-            properlyDimensionedState = np.array(expandedState, ndmin=len(expandedState)-1)
+            properlyDimensionedState = np.array(expandedState, ndmin=2)
 
             predictedReward = self.Model.predict(properlyDimensionedState)
 
@@ -278,13 +311,13 @@ class ReinforcementLearningCore(object):
         # load in the run logs for this current run and then get the values of a reward
         runLogDF = pd.read_csv(self.ModelTraceFilePath)
 
-        actions = runLogDF['Action'].unique()
+        actions = runLogDF[self.ActionIDFieldText].unique()
 
         actionInfoList = dict()
 
         for action in actions:
             # get specific action stats
-            actionDF = runLogDF[runLogDF['Action'] == action]
+            actionDF = runLogDF[runLogDF[self.ActionIDFieldText] == action]
 
             rewardDF = actionDF['Reward']
 
@@ -294,8 +327,7 @@ class ReinforcementLearningCore(object):
 
             actionInfoList[int(action)] = {'mean': avg, 'std': std, 'count': int(count)}
 
-        newFields = {'environmental-config': '--',
-                     'time-training-started': self.DateTimeOfSessionStart.strftime(self.DateFormat),
+        newFields = {'time-training-started': self.DateTimeOfSessionStart.strftime(self.DateFormat),
                      'time-training-ended': self.DateTimeOfSessionEnd.strftime(self.DateFormat),
                      'runLengthInSteps': self.RunDuration,
                      'action-breakdown': actionInfoList}
@@ -322,7 +354,12 @@ class ReinforcementLearningCore(object):
 
         mlconfigFileDS.flush()
         mlconfigFileDS.close()
+        print('Model Output Report Written')
 
     # Return a numeric reward value based on metrics
     def Reward(self, stateData):
         return NotImplementedError
+
+    # Return the action index, or change it via overriding this method
+    def ReturnAction(self, stateData, reward, actionIndex):
+        return actionIndex

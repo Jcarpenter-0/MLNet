@@ -1,22 +1,39 @@
 import http.server
-import sys
 import time
 import json
-
+import sys
+import signal
 
 # Server code for learners
 
+# Using a "run-stub.py" method in each learner sub directory this will be invoked
+
 # GET will advertise the type of input/output the learner uses
 
-# POST will recieve data from applications and then send back responses
+# POST will receive data from applications and then send back responses
 
-# This code will plug in a model
+Learner = None
 
-# Harness for running Applications
+def parseArgs():
+    # Parse Args
+    port = int(sys.argv[1])
+    address = ''
+    modelLearning = bool(int(sys.argv[2]))
+    try:
+        address = sys.argv[3]
+    except:
+        pass
+
+    return port, address, modelLearning
+
+def DefineLearner(learner):
+    global Learner
+    Learner = learner
 
 class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
+
         requestTimeStart = time.time()
 
         # based on asset type, change cc
@@ -35,10 +52,11 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
 
         jsonDescription = json.dumps(descriptionDict, indent=5)
 
-        self.wfile.write(jsonDescription.encode())
-
+        # set the headers
         self.send_response(200)
         self.end_headers()
+
+        self.wfile.write(jsonDescription.encode())
 
         requestTimeEnd = time.time()
 
@@ -59,43 +77,26 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
         # Convert commands to Json
         returnCommandsJson = json.dumps(returnCommandsDict, indent=5)
 
-        # Finish web transaction
-        self.wfile.write(returnCommandsJson.encode())
-
+        # set HTTP headers
         self.send_response(200)
         self.end_headers()
+
+        # Finish web transaction
+        self.wfile.write(returnCommandsJson.encode())
 
 class OperationServer(object):
     def __init__(self, serverAddress, port):
         self.serverAddress = (serverAddress, port)
         self.httpd = http.server.HTTPServer(self.serverAddress, OperationServerHandler)
+        self.Operate = True
+        signal.signal(signal.SIGTERM, self.cleanup)
 
     def run(self):
-        self.httpd.serve_forever()
+        while self.Operate:
+            self.httpd.handle_request()
 
     def cleanup(self):
+        print('Learner Server Cleaning up')
+        self.Operate = False
+        Learner.Conclude()
         self.httpd.shutdown()
-
-if __name__ == '__main__':
-
-    # Parse Args
-    port = int(sys.argv[1])
-    address = ''
-    try:
-        address = sys.argv[2]
-    except:
-        pass
-
-    webserver = OperationServer(address, port)
-
-    global Learner
-    Learner = None
-
-    try:
-        webserver.run()
-    except KeyboardInterrupt:
-        webserver.cleanup()
-        Learner.Conclude()
-    except:
-        webserver.cleanup()
-        Learner.Conclude()
