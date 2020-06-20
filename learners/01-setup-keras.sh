@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # install old keras
 pip3 install keras==2.1.5
 

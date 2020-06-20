@@ -41,13 +41,16 @@ class ReinforcementLearningCore(object):
         # Ensure folder creation
         os.makedirs(self.CoreFolder, exist_ok=True)
 
-        self.ModelTraceHeader = 'Timestamp,Reward'
-
         # Training flag
         self.Training = training
 
         # Acting flag, will return actions when states provided
         self.Acting = acting
+
+        if self.Acting and self.Training:
+            self.ModelTraceHeader = 'Timestamp,Reward,Exploit'
+        else:
+            self.ModelTraceHeader = 'Timestamp,Reward'
 
         self.ModelLogFilePath = self.CoreFolder + '{}-report.json'.format(self.ModelName)
 
@@ -161,7 +164,7 @@ class ReinforcementLearningCore(object):
     # Take in stateData (as a Python Dict), return a command structure (as a Python Dict)
     def Operate(self, stateData):
 
-        returnErrorBody = {'ActionID': -1}
+        returnErrorBody = {self.ActionIDFieldText: -1}
 
         if self.Training:
             # Need the action ID field in data
@@ -174,6 +177,7 @@ class ReinforcementLearningCore(object):
                 # remove it from the state
                 del stateData[self.ActionIDFieldText]
 
+        stateData = self.ModifyState(stateData)
 
         # Calculate Reward Value
         reward = self.Reward(stateData)
@@ -194,7 +198,11 @@ class ReinforcementLearningCore(object):
             traceFileDS.write(headerLine + '\n')
 
         # write out all the state info collected by the RL
-        logLine = '{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
+        if self.Acting and self.Training:
+            logLine = '{},{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward, self.LastActionType)
+        else:
+            logLine = '{},{},'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
+
 
         # Get actions/commands
         actionID = -1
@@ -224,7 +232,7 @@ class ReinforcementLearningCore(object):
         self.CurrentStep += 1
         self.RunDuration += 1
 
-        return {'ActionID': actionID}
+        return {self.ActionIDFieldText: actionID}
 
     # Observe environment, based on epsilon either explore or exploit (seek highest reward)
     def Train(self, state, reward):
@@ -245,7 +253,6 @@ class ReinforcementLearningCore(object):
         self.Model.save(self.ModelFilePath)
 
         # determine if agent will take random action, or if it will select the highest rewarding action
-
         selectedAction = -1
 
         # Explore or Exploit, if acting
@@ -360,6 +367,57 @@ class ReinforcementLearningCore(object):
     def Reward(self, stateData):
         return NotImplementedError
 
+    # Possibly trim the state here or modify if you wish
+    def ModifyState(self, stateData):
+        return stateData
+
     # Return the action index, or change it via overriding this method
     def ReturnAction(self, stateData, reward, actionIndex):
         return actionIndex
+
+
+'''Base Class'''
+class Learner(object):
+    def __init__(self):
+
+        # Fields to describe the Learner's high level details
+        self.Description = ''
+        self.InputFieldDescriptions = ''
+        self.OutputFieldDescriptions = ''
+
+    # Return a Dict describing the learner, and inputs/outputs
+    def Describe(self):
+
+        descriptionDict = {'Description': self.Description,
+                           'InputFieldDescriptions': self.InputFieldDescriptions,
+                           'OutputFieldDescriptions': self.OutputFieldDescriptions}
+
+        return descriptionDict
+
+    # Take in stateData (as a Python Dict), return a command structure (as a Python Dict)
+    def Operate(self, stateData):
+        return
+
+    # Observe environment, based on epsilon either explore or exploit (seek highest reward)
+    def Train(self, state, reward):
+        return
+
+    # Make actionable decision and then return
+    def Act(self, state):
+        return
+
+    # write out the trace file, ml report
+    def Conclude(self):
+        return
+
+    # Return a numeric reward value based on metrics
+    def Reward(self, stateData):
+        return NotImplementedError
+
+    # Possibly trim the state here or modify if you wish
+    def ModifyState(self, stateData):
+        return stateData
+
+'''Keras implementation of a multi-model future state predictive algorithm'''
+class KerasComplex(Learner):
+

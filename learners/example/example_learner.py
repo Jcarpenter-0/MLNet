@@ -4,7 +4,7 @@ import learners.learner_common
 class ReinforcementLearner(learners.learner_common.ReinforcementLearningCore):
 
     def __init__(self, training):
-        super().__init__('example', 2, modellayers=[keras.layers.Dense(20, input_dim=3, activation='relu')],epochcount=2, training=training)
+        super().__init__('example', 2, modellayers=[keras.layers.Dense(20, input_dim=3, activation='relu')],epochcount=2, training=training, verbose=True)
 
         self.Description = 'Example Learner, will take in numeric only data, sum them, and will reward based on that sum.'
         self.InputFieldDescriptions = 'Any number of numeric fields, and the action index.'
