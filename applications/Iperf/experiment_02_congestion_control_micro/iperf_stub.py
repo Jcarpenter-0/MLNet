@@ -44,6 +44,9 @@ iperfArgsDict['-J'] = None
 prevActionID = 0
 
 # Run multiple times
+
+StartVector = {'bps-0':0, 'retransmits-0':0}
+
 for runNum in range(0, runCount):
 
     iperfCommand = []
@@ -65,14 +68,20 @@ for runNum in range(0, runCount):
     # Prune from the dict what you only want to send
     sendDict = dict()
 
-    sendDict['bps'] = iperfProcResultDict['end']['sum_sent']['bits_per_second']
-    sendDict['retransmits'] = iperfProcResultDict['end']['sum_sent']['retransmits']
+    sendDict['bps-1'] = iperfProcResultDict['end']['sum_sent']['bits_per_second']
+    sendDict['retransmits-1'] = iperfProcResultDict['end']['sum_sent']['retransmits']
+    sendDict['bps-0'] = StartVector['bps-0']
+    sendDict['retransmits-0'] = StartVector['retransmits-0']
 
     # Append the actionID of the action taken
     sendDict['actionID'] = prevActionID
 
     # Encode from dict to JSON again
     jsonData = json.dumps(sendDict)
+
+    # Update the start vector
+    StartVector['bps-0'] = sendDict['bps-1']
+    StartVector['retransmits-0'] = sendDict['retransmits-1']
 
     # Send to learner, and get new action
     response = requests.post(learner, data=jsonData)

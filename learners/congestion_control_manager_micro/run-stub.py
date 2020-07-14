@@ -12,8 +12,8 @@ if __name__ == '__main__':
     port, address, training = learners.learner_server.parseArgs()
 
     # EDIT - Define the learner===========================================
-    from learners.congestion_control_manager_micro.cc_learner import ReinforcementLearner
-    learner = ReinforcementLearner(training=training)
+    from learners.congestion_control_manager_micro.cc_learner_alt import CCLearner
+    learner = CCLearner(training=training)
     # ====================================================================
 
     learners.learner_server.DefineLearner(learner)

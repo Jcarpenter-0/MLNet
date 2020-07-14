@@ -1,0 +1,4 @@
+# Illegal operation (core dumped)
+Check tensorflow, it may be running a new version on an older cpu
+
+

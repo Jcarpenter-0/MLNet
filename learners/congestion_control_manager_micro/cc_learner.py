@@ -18,12 +18,6 @@ class ReinforcementLearner(learners.learner_common.ReinforcementLearningCore):
         self.InputFieldDescriptions = '{\'bps\':<float>, \'retransmits\':<int>, \'actionID\':<int>} Bits per second (bps) of the iperf run, retransmission count, and the action id corresponding to the CC used.'
         self.OutputFieldDescriptions = 'Returned CC to use: 0=cubic, 1=bbr, 2=vegas, 3=reno'
 
-    def ModifyState(self, stateData):
-
-        
-
-        return preprocessing.normalize(stateData)
-
     def Reward(self, stateData):
         reward = int(stateData["bps"]/1000000) * 1 - int(stateData["retransmits"]) * 1
         return reward

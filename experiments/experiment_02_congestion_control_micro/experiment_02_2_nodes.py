@@ -19,8 +19,8 @@ NetworkNodes = [['mm-delay', '40', 'python3', DirOffset + 'applications/operatio
                 ]
 
 # Define Applications as tuple (<host address>, <[args to the application]>)
-Applications = [('http://100.64.0.2:8081', ['python3', DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py', '100', 'http://100.64.0.1:8080', '-c|100.64.0.1'])
+Applications = [('http://100.64.0.2:8081', ['python3', DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py', '1000', 'http://100.64.0.1:8080', '-c|100.64.0.1'])
                 ,('http://localhost:8081', ['iperf3', '-s'])
                 ]
 
-experiments.experiments_common.runExperiment(NetworkNodes, Learners, Applications, 1100, 10, 10, DirOffset)
+experiments.experiments_common.runExperiment(NetworkNodes, Learners, Applications, 1800, 10, 10, DirOffset)

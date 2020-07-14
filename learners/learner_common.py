@@ -3,328 +3,205 @@ import json
 import pandas as pd
 import numpy as np
 import datetime
-import keras
 import random
+import copy
+from sklearn import preprocessing
 
-class ReinforcementLearningCore(object):
+'''Base Class'''
+class Learner(object):
 
-    def __init__(self, modelname, numberofactions, training=True, acting=True, verbose=False, epochcount=16,epsilon=65,
-                 learningrate=0.001,lossfunction='mean_squared_error',modellayers=[]):
-        """
-        modelname:
-        numberofactions:
-        training:
-        verbose:
-        epochcount:
-        epsilon:
-        learningrate:
-        lossfunction:
-        modellayers:
-        activation:
-        """
+    """"""
+    def __init__(self
+                 , learnerName
+                 , training
+                 , numberOfActions
+                 , epsilon
+                 , inputFieldNames
+                 , normalizationApproach
+                 , normalizationAxis
+                 ):
 
-        # Model I/O and Functional Descriptions
+        self.LearnerName = learnerName
+
+        # Fields to describe the Learner's high level details
         self.Description = ''
-        self.InputFieldDescriptions = []
-        self.OutputFieldDescriptions = []
-        # the literal text name to check for input to prune for testing and check for training
-        self.ActionIDFieldText = 'actionID'
+        self.InputFieldDescriptions = ''
+        self.OutputFieldDescriptions = ''
+        self.InputFieldNames = inputFieldNames
 
-        # Configurations ----------------------------------------------------------------------------------------------
-        self.Verbose = verbose
-        self.DateFormat = "%d-%m-%Y-%H-%M-%S"
-
-        # File Locations
-        self.ModelName = modelname
-        self.CoreFolder = './tmp/{}/'.format(self.ModelName)
-
-        # Ensure folder creation
-        os.makedirs(self.CoreFolder, exist_ok=True)
-
-        # Training flag
-        self.Training = training
-
-        # Acting flag, will return actions when states provided
-        self.Acting = acting
-
-        if self.Acting and self.Training:
-            self.ModelTraceHeader = 'Timestamp,Reward,Exploit'
-        else:
-            self.ModelTraceHeader = 'Timestamp,Reward'
-
-        self.ModelLogFilePath = self.CoreFolder + '{}-report.json'.format(self.ModelName)
-
-        # datetime of starting
-        self.DateTimeOfSessionStart = datetime.datetime.now()
-
-        if self.Training:
-            self.ModelTraceFilePath = self.CoreFolder + '{}-training-runlogs.csv'.format(self.DateTimeOfSessionStart.strftime(self.DateFormat))
-        else:
-            self.ModelTraceFilePath = self.CoreFolder + '{}-testing-runlogs.csv'.format(self.DateTimeOfSessionStart.strftime(self.DateFormat))
-
-        # make trace file
-        traceFileFD = open(self.ModelTraceFilePath, 'w')
-        traceFileFD.flush()
-        traceFileFD.close()
-
-        self.ModelFilePath = self.CoreFolder + '{}'.format(self.ModelName)
-
-        # number of epochs to train over (present the data obtained n times to the trainer)
-        self.EpochCount = epochcount
-
-        # threshold to explore/exploit
-        self.Epsilon = epsilon
-
-        # Total number of actions the system can take
-        self.NumberOfActions = numberofactions
-
-        # Duration Tracking, the number of training steps that occur (Note: this is presentations of the environment not the epochs)
+        # Some Learner Metadata
         self.RunDuration = 0
-
-        # Keras Model creation
-        self.LearningRate = learningrate
-        self.Model = keras.models.Sequential()
-
-        self.LossFunction = lossfunction
-
-        # Add the layers
-        self.LayerCount = len(modellayers)
-
-        # for each layer add it
-
-        # also note the traits of the layers for the output report
-        layerDescriptors = []
-
-        for layer in modellayers:
-            self.Model.add(layer)
-            layerDescriptors.append({'density': layer.units})
-
-        # Output Layer
-        outputLayer = keras.layers.Dense(1)
-        self.Model.add(outputLayer)
-
-        # add output layer info to report
-        layerDescriptors.append({'density': outputLayer.units})
-
-        # Fixed/Variables ----------------------------------------------------------------------------------------------
-        self.CurrentStep = 1
-        self.FirstLogWrite = True
-
-        # Last action is a explore or exploit
+        self.Training = training
+        self.Verbose = False
+        self.NumberOfActions = numberOfActions
         self.LastActionType = 0
 
-        if os.path.exists(self.ModelFilePath):
-            # load in an existing model
-            self.Model.load_weights(self.ModelFilePath)
-            print('Loading existing model, {}'.format(self.ModelFilePath))
-        else:
-            print('No existing model present, creating new model')
+        self.Epsilon = epsilon
+        self.NormalizationApproach = normalizationApproach
+        self.NormalizationAxis = normalizationAxis
 
-            # Setup the Configurations File
-            jsonBody = {'model-configurations': {
-                'Epochs': self.EpochCount,
-                'ExploreOrExploitChance': self.Epsilon,
-                'LearningRate': self.LearningRate,
-                'LossFunction': self.LossFunction,
-                'Layers': layerDescriptors
+        # Start time of the learner's session
+        self.LearnerStartSession = datetime.datetime.now()
+
+        # Some field Constants
+        self.ActionFieldText = 'actionID'
+        self.DateFormat = "%d-%m-%Y-%H-%M-%S"
+        self.CoreFolderRoot = './tmp/' + learnerName + '/'
+        self.ModelFolderRoot = self.CoreFolderRoot + 'models/'
+        self.TracesFolderRoot = self.CoreFolderRoot + 'traces/'
+        self.ReportFileName = self.CoreFolderRoot + learnerName + '-report.json'
+
+        self.CurrentTraceFileHeaders = 'Timestamp,Reward'
+
+        if self.Training:
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-training-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
+            self.CurrentTraceFileHeaders += ',Exploit'
+        else:
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-testing-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
+
+        # Add extra state headers
+        for inputField in self.InputFieldNames:
+            self.CurrentTraceFileHeaders += ',' + inputField
+
+        self.CurrentTraceFileHeaders += '\n'
+
+        # Ensure folder creation
+        os.makedirs(self.CoreFolderRoot, exist_ok=True)
+        os.makedirs(self.ModelFolderRoot, exist_ok=True)
+        os.makedirs(self.TracesFolderRoot, exist_ok=True)
+
+        # Setup trace file
+        self.CurrentTraceFileDS = open(self.CurrentTraceFileName, 'w')
+
+        self.CurrentTraceFileDS.write(self.CurrentTraceFileHeaders)
+
+        self.CurrentTraceFileDS.flush()
+
+        # Setup the Configurations File
+        if os.path.exists(self.ReportFileName) is False:
+            jsonBody = {'learner-configurations': {
+
             },
                 'training-sessions': []
                 ,
                 'testing-sessions': []
-
             }
 
-            mlconfigFileDS = open(self.ModelLogFilePath, 'w')
+            mlconfigFileDS = open(self.ReportFileName, 'w')
 
             mlconfigFileDS.write(json.dumps(jsonBody, indent=5))
 
             mlconfigFileDS.flush()
             mlconfigFileDS.close()
 
-        # set the learning rate
-        optimizer = keras.optimizers.Adam(lr=self.LearningRate)
-
-        # ???
-        metrics = ['accuracy']
-
-        # Finally put model together for training
-        self.Model.compile(optimizer, loss=self.LossFunction, metrics=metrics)
-
     # Return a Dict describing the learner, and inputs/outputs
     def Describe(self):
 
         descriptionDict = {'Description': self.Description,
-                           'Training': self.Training,
-                           'TrainingAndActing': self.Acting,
                            'InputFieldDescriptions': self.InputFieldDescriptions,
                            'OutputFieldDescriptions': self.OutputFieldDescriptions}
 
         return descriptionDict
 
-    # Take in stateData (as a Python Dict), return a command structure (as a Python Dict)
+    '''Take in stateData (as a Python Dict), return a command structure (as a Python Dict)'''
     def Operate(self, stateData):
+        # do potential state conversion
 
-        returnErrorBody = {self.ActionIDFieldText: -1}
+        # convert stateData (python dict) to pandas dataframe
 
+        # prep for conversion
+        for key in stateData.keys():
+            # box into lists each entry
+            stateData[key] = [stateData[key]]
+
+        state = pd.DataFrame.from_dict(stateData)
+
+        print('State DF {}'.format(state.shape))
+        print(state.head())
+
+        state = self.ModifyState(state)
+
+        # Do potential normalization
+        if self.NormalizationApproach is not None:
+            state = pd.DataFrame(columns=state.columns
+                                , data=preprocessing.normalize(state.values
+                                , norm=self.NormalizationApproach
+                                , axis=self.NormalizationAxis))
+
+        print('State-Normalized')
+        print(state.head())
+
+        # calculate reward
+        reward = self.Reward(state)
+
+        # write out trace file
         if self.Training:
-            # Need the action ID field in data
-            if self.ActionIDFieldText not in stateData.keys():
-                returnErrorBody['comment'] = 'Need action ID field for training, see GET'
-                return returnErrorBody
-        else:
-            # remove action if present
-            if self.ActionIDFieldText in stateData.keys():
-                # remove it from the state
-                del stateData[self.ActionIDFieldText]
-
-        stateData = self.ModifyState(stateData)
-
-        # Calculate Reward Value
-        reward = self.Reward(stateData)
-
-        # Write out the trace line
-        traceFileDS = open(self.ModelTraceFilePath, 'a')
-
-        # check if first time writing out
-        if self.FirstLogWrite:
-            self.FirstLogWrite = False
-
-            headerLine = self.ModelTraceHeader
-
-            # write out the state
-            for key in stateData.keys():
-                headerLine += ',{}'.format(key)
-
-            traceFileDS.write(headerLine + '\n')
-
-        # write out all the state info collected by the RL
-        if self.Acting and self.Training:
             logLine = '{},{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward, self.LastActionType)
         else:
             logLine = '{},{},'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
 
-
-        # Get actions/commands
-        actionID = -1
-
-        # Train from state data
-        if self.Training:
-            # Train then return an action
-            actionID = self.Train(stateData, reward)
-        else:
-            # Take action
-            actionID = self.Act(stateData)
-            stateData[self.ActionIDFieldText] = actionID
-
-        # potentially change the action based on hueristic or other types
-        actionID = self.ReturnAction(stateData, reward, actionID)
-
         # write out each of the state values
-        for value in stateData.values():
-            logLine += ',{}'.format(value)
+        for key in self.InputFieldNames:
+            logLine += ',{}'.format(stateData[key][0])
 
-        traceFileDS.write('{}\n'.format(logLine))
+        self.CurrentTraceFileDS.write('{}\n'.format(logLine))
 
-        traceFileDS.flush()
-        traceFileDS.close()
+        self.CurrentTraceFileDS.flush()
 
-        # Increment Common Metrics
-        self.CurrentStep += 1
+        # do potential training
+        explore = False
+
+        if self.Training:
+            explore = self.Train(state)
+
+        # Explore or Exploit for next action (will always exploit when not training)
+        if explore:
+            # pick a random action
+            nextAction = random.randint(0, self.NumberOfActions-1)
+            self.LastActionType = 0
+        else:
+            nextAction = self.Act(state)
+            self.LastActionType = 1
+
         self.RunDuration += 1
 
-        return {self.ActionIDFieldText: actionID}
+        return {self.ActionFieldText: nextAction}
 
-    # Observe environment, based on epsilon either explore or exploit (seek highest reward)
-    def Train(self, state, reward):
+    """Fit model with data from the state (as a pandas dataframe)"""
+    def Train(self, state):
+        return NotImplementedError
 
-        expandedState = list(state.values())
-
-        properlyDimensionedState = np.array(expandedState, ndmin=2)
-
-        # Fit action to reward, so that given an action we can see the potential impact
-        trainingResult = self.Model.fit(properlyDimensionedState, [reward], epochs=self.EpochCount, verbose=self.Verbose)
-
-        if self.Verbose:
-            print(str(trainingResult))
-
-        print('Training-Reward {} State {} Action Type {}'.format(reward, state, self.LastActionType))
-
-        # Save model out
-        self.Model.save(self.ModelFilePath)
-
-        # determine if agent will take random action, or if it will select the highest rewarding action
-        selectedAction = -1
-
-        # Explore or Exploit, if acting
-        if self.Acting:
-            if random.randint(1,100) <= self.Epsilon:
-                # Explore
-                self.LastActionType = 0
-                # Pick a random action
-                selectedAction = random.randint(0,self.NumberOfActions-1)
-            else:
-                # Exploit
-                self.LastActionType = 1
-                selectedAction = self.Act(state)
-
-        return selectedAction
-
-    # Make actionable decision and then return
+    """Apply the model to data from state (as a pandas dataframe) to make the next action"""
     def Act(self, state):
+        return NotImplementedError
 
-        # pick an action based on highest reward
-        # Of all possible actions, predict reward for each, take highest
-        highestReward = -1
-        highestRewardActionIndex = -1
-
-        statecopy = dict()
-
-        for key in state.keys():
-            statecopy[key] = state[key]
-
-        # Try different actions, see what reward they may make
-        for actionIndex in range(0, self.NumberOfActions):
-
-            statecopy[self.ActionIDFieldText] = actionIndex
-
-            expandedState = list(statecopy.values())
-
-            properlyDimensionedState = np.array(expandedState, ndmin=2)
-
-            predictedReward = self.Model.predict(properlyDimensionedState)
-
-            if self.Verbose:
-                print('Predicted Reward {} for State {}'.format(predictedReward, expandedState))
-
-            if predictedReward > highestReward:
-                highestReward = predictedReward
-                highestRewardActionIndex = actionIndex
-
-        return highestRewardActionIndex
-
-    # write out the trace file, ml report
+    '''Write out logs for training sessions and the model's criterias'''
     def Conclude(self):
 
         # conclusion time
-        self.DateTimeOfSessionEnd = datetime.datetime.now()
+        self.LearnerStopSession = datetime.datetime.now()
+
+        # close trace file
+        self.CurrentTraceFileDS.flush()
+        self.CurrentTraceFileDS.close()
 
         # Update the run config, read first, close, then reopen to write it back out with new info
-        mlconfigFileDS = open(self.ModelLogFilePath, 'r')
+        mlconfigFileDS = open(self.ReportFileName, 'r')
 
         configData = json.load(mlconfigFileDS)
 
         mlconfigFileDS.close()
 
         # load in the run logs for this current run and then get the values of a reward
-        runLogDF = pd.read_csv(self.ModelTraceFilePath)
+        runLogDF = pd.read_csv(self.CurrentTraceFileName)
 
-        actions = runLogDF[self.ActionIDFieldText].unique()
+        actions = runLogDF[self.ActionFieldText].unique()
 
         actionInfoList = dict()
 
         for action in actions:
             # get specific action stats
-            actionDF = runLogDF[runLogDF[self.ActionIDFieldText] == action]
+            actionDF = runLogDF[runLogDF[self.ActionFieldText] == action]
 
             rewardDF = actionDF['Reward']
 
@@ -334,8 +211,8 @@ class ReinforcementLearningCore(object):
 
             actionInfoList[int(action)] = {'mean': avg, 'std': std, 'count': int(count)}
 
-        newFields = {'time-training-started': self.DateTimeOfSessionStart.strftime(self.DateFormat),
-                     'time-training-ended': self.DateTimeOfSessionEnd.strftime(self.DateFormat),
+        newFields = {'time-training-started': self.LearnerStartSession.strftime(self.DateFormat),
+                     'time-training-ended': self.LearnerStopSession.strftime(self.DateFormat),
                      'runLengthInSteps': self.RunDuration,
                      'action-breakdown': actionInfoList}
 
@@ -354,8 +231,7 @@ class ReinforcementLearningCore(object):
 
             configData['testing-sessions'] = listOfTestingEntries
 
-
-        mlconfigFileDS = open(self.ModelLogFilePath, 'w')
+        mlconfigFileDS = open(self.ReportFileName, 'w')
 
         mlconfigFileDS.write(json.dumps(configData, indent=5))
 
@@ -371,53 +247,136 @@ class ReinforcementLearningCore(object):
     def ModifyState(self, stateData):
         return stateData
 
-    # Return the action index, or change it via overriding this method
-    def ReturnAction(self, stateData, reward, actionIndex):
-        return actionIndex
+'''Keras implementation of a multi-model future state predictive algorithm'''
+'''Takes in a starter vector plus finish vector with action transition'''
 
+'''Useful links'''
+'''https://towardsdatascience.com/building-a-deep-learning-model-using-keras-1548ca149d37'''
+'''https://stats.stackexchange.com/questions/284189/simple-linear-regression-in-keras'''
+''''''
+class KerasDelta(Learner):
 
-'''Base Class'''
-class Learner(object):
-    def __init__(self):
+    """Start Vector is the initial values or a first run state
+    End Vector is the values of a second run to contrast with first run, plus the action that got there
+    """
+    def __init__(self
+                 , startVectorFieldNames
+                 , endVectorFieldNames
+                 , learnerName
+                 , training
+                 , numberOfActions
+                 , epsilon
+                 , epochs
+                 , normalizationApproach
+                 , normalizationAxis
+                 ):
+        inputFieldNames = copy.deepcopy(startVectorFieldNames)
+        inputFieldNames.extend(endVectorFieldNames)
+        super().__init__(
+                        learnerName=learnerName
+                         , training=training
+                         , numberOfActions=numberOfActions
+                         , epsilon=epsilon
+                         , inputFieldNames=inputFieldNames
+                        , normalizationAxis=normalizationAxis
+                        , normalizationApproach=normalizationApproach
+        )
 
-        # Fields to describe the Learner's high level details
-        self.Description = ''
-        self.InputFieldDescriptions = ''
-        self.OutputFieldDescriptions = ''
+        self.Epochs = epochs
+        self.StartVectorFieldNames = startVectorFieldNames
+        self.EndVectorFieldNames = endVectorFieldNames
 
-    # Return a Dict describing the learner, and inputs/outputs
-    def Describe(self):
+        # Models
+        self.ModelReferences = dict()
 
-        descriptionDict = {'Description': self.Description,
-                           'InputFieldDescriptions': self.InputFieldDescriptions,
-                           'OutputFieldDescriptions': self.OutputFieldDescriptions}
+        # Feed in list of strings, the names of all the fields expected
+        # The model names will be the patterns of fields and actions
+        inputCount = len(startVectorFieldNames)
 
-        return descriptionDict
+        # Generate modelnames
+        # Model naming scheme, 'predictedvariable'
+        # Example: 'retransmits'
+        for endVector in endVectorFieldNames:
 
-    # Take in stateData (as a Python Dict), return a command structure (as a Python Dict)
-    def Operate(self, stateData):
-        return
+            # Take a field, and then create a sequence of the other fields
+            self.ModelReferences[endVector] = self.BaseModelGeneration(endVector, inputCount)
 
-    # Observe environment, based on epsilon either explore or exploit (seek highest reward)
-    def Train(self, state, reward):
-        return
+    '''Return new instance of a keras model, fully compiled'''
+    def BaseModelGeneration(self, modelName, inputCount):
+        return NotImplementedError
 
-    # Make actionable decision and then return
-    def Act(self, state):
-        return
+    '''Hand the state off to each of the models'''
+    def Train(self, state):
 
-    # write out the trace file, ml report
-    def Conclude(self):
-        return
+        for modelname in self.ModelReferences.keys():
 
-    # Return a numeric reward value based on metrics
+            model = self.ModelReferences[modelname]
+
+            # Get target values
+            train_y = state[modelname]
+
+            # Make dataframe of state, without the targeted field
+            train_x = state.copy()
+            train_x = train_x.drop(columns=self.EndVectorFieldNames)
+
+            # Fit action to reward, so that given an action we can see the potential impact
+            trainingResult = model.fit(train_x, train_y
+                                       , epochs=self.Epochs
+                                       , verbose=self.Verbose)
+
+            # Save model out
+            model.save(self.ModelFolderRoot + modelname)
+
+        # Return explore/exploit
+        return random.randint(1, 100) <= self.Epsilon
+
     def Reward(self, stateData):
         return NotImplementedError
 
-    # Possibly trim the state here or modify if you wish
-    def ModifyState(self, stateData):
-        return stateData
+    '''Predict the next state based on potential actions and then pick highest rewarding entry'''
+    def Act(self, state):
 
-'''Keras implementation of a multi-model future state predictive algorithm'''
-class KerasComplex(Learner):
+        highestRewardingAction = -1
+        highestReward = -1
 
+        # For each action, try to predict it's impact on the new state
+        for actionID in range(0, self.NumberOfActions):
+
+            newState = pd.DataFrame()
+
+            for modelname in self.ModelReferences.keys():
+
+                model = self.ModelReferences[modelname]
+
+                # Make dataframe of state, without the targeted field
+                test_x = state.copy()
+                test_x = test_x.drop(columns=self.EndVectorFieldNames)
+                # Set action id
+                test_x[self.ActionFieldText] = [actionID]
+
+                predictedValue = model.predict(test_x)[0][0]
+
+                print('Predicted {} {}'.format(modelname, predictedValue))
+
+                newState[modelname] = [predictedValue]
+                print(newState)
+
+
+            # Analyze the predicted new state, do reward calculation
+            newStateString = ''
+
+            for key in newState.columns:
+                newStateString += '{}:{}'.format(key, newState.iloc[0][key])
+
+            print('Predicted new Action {} State {}'.format(actionID, newStateString))
+
+            calcReward = self.Reward(newState)
+
+            print('Predicted new Action {} State {} Reward:{}'.format(actionID, newStateString, calcReward))
+
+            if calcReward > highestReward:
+                highestReward = calcReward
+                highestRewardingAction = actionID
+
+        # End action For
+        return highestRewardingAction
