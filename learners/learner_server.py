@@ -18,13 +18,26 @@ def parseArgs():
     # Parse Args
     port = int(sys.argv[1])
     address = ''
-    modelLearning = bool(int(sys.argv[2]))
+    modelMode = int(sys.argv[2])
+    modelName = None
+    validationPatternFilePath = None
+    print('sys args:' + str(sys.argv))
     try:
-        address = sys.argv[3]
+        modelName = sys.argv[3]
     except:
         pass
 
-    return port, address, modelLearning
+    try:
+        validationPatternFilePath = sys.argv[4]
+    except:
+        pass
+
+    try:
+        address = sys.argv[5]
+    except:
+        pass
+
+    return port, address, modelMode, modelName, validationPatternFilePath
 
 def DefineLearner(learner):
     global Learner

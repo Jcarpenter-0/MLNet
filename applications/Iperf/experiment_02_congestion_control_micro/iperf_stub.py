@@ -84,14 +84,16 @@ for runNum in range(0, runCount):
     StartVector['retransmits-0'] = sendDict['retransmits-1']
 
     # Send to learner, and get new action
-    response = requests.post(learner, data=jsonData)
+    print('Sending {}'.format(sendDict))
 
-    print(str(response.content))
+    response = requests.post(learner, data=jsonData)
 
     respDict = json.loads(response.content.decode())
 
     # Convert action to paras
     newActionID = respDict['actionID']
+
+    print('Recieved ActionID {}'.format(newActionID))
 
     if newActionID == 0:
         # cubic
@@ -105,7 +107,7 @@ for runNum in range(0, runCount):
         # vegas
         iperfArgsDict['-C'] = 'vegas'
         prevActionID = 2
-    elif prevActionID == 3:
+    elif newActionID == 3:
         # reno
         iperfArgsDict['-C'] = 'reno'
         prevActionID = 3

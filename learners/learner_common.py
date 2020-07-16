@@ -10,10 +10,12 @@ from sklearn import preprocessing
 '''Base Class'''
 class Learner(object):
 
-    """"""
+    """Learner Definition
+    learnerMode = Mode to set the learner in, 0=testing, 1=training, 2=validating"""
     def __init__(self
                  , learnerName
-                 , training
+                 , learnerMode
+                 , validationPattern
                  , numberOfActions
                  , epsilon
                  , inputFieldNames
@@ -31,7 +33,9 @@ class Learner(object):
 
         # Some Learner Metadata
         self.RunDuration = 0
-        self.Training = training
+        self.Training = learnerMode == 1
+        self.ValidationPattern = validationPattern
+        self.LearnerMode = learnerMode
         self.Verbose = False
         self.NumberOfActions = numberOfActions
         self.LastActionType = 0
@@ -52,12 +56,29 @@ class Learner(object):
         self.ReportFileName = self.CoreFolderRoot + learnerName + '-report.json'
 
         self.CurrentTraceFileHeaders = 'Timestamp,Reward'
+        self.CurrentDecisionTraceFileHeaders = 'Timestamp,Step,{},Predicted-State,Reward,Input-State\n'.format(self.ActionFieldText)
 
-        if self.Training:
+        # Set to Nones at first, then populate via mode
+        self.CurrentDecisionTraceFileName = None
+
+        # Setup for the modes
+        if self.LearnerMode == 0:
+            # Testing
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-testing-runlogs.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat))
+            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-testing-declog.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat))
+
+        elif self.LearnerMode == 1:
+            # Training
             self.CurrentTraceFileName = self.TracesFolderRoot + '{}-training-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
+            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-training-declog.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
             self.CurrentTraceFileHeaders += ',Exploit'
-        else:
-            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-testing-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
+
+        elif self.LearnerMode == 2:
+            # Validating
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-validation-runlogs.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat))
 
         # Add extra state headers
         for inputField in self.InputFieldNames:
@@ -70,12 +91,15 @@ class Learner(object):
         os.makedirs(self.ModelFolderRoot, exist_ok=True)
         os.makedirs(self.TracesFolderRoot, exist_ok=True)
 
-        # Setup trace file
+        # Setup trace files
         self.CurrentTraceFileDS = open(self.CurrentTraceFileName, 'w')
-
         self.CurrentTraceFileDS.write(self.CurrentTraceFileHeaders)
-
         self.CurrentTraceFileDS.flush()
+
+        if self.CurrentDecisionTraceFileName is not None:
+            self.CurrentDecisionTraceFileDS = open(self.CurrentDecisionTraceFileName, 'w')
+            self.CurrentDecisionTraceFileDS.write(self.CurrentDecisionTraceFileHeaders)
+            self.CurrentDecisionTraceFileDS.flush()
 
         # Setup the Configurations File
         if os.path.exists(self.ReportFileName) is False:
@@ -85,6 +109,8 @@ class Learner(object):
                 'training-sessions': []
                 ,
                 'testing-sessions': []
+                ,
+                'validation-sessions': []
             }
 
             mlconfigFileDS = open(self.ReportFileName, 'w')
@@ -98,6 +124,7 @@ class Learner(object):
     def Describe(self):
 
         descriptionDict = {'Description': self.Description,
+                           'Mode': self.LearnerMode,
                            'InputFieldDescriptions': self.InputFieldDescriptions,
                            'OutputFieldDescriptions': self.OutputFieldDescriptions}
 
@@ -116,8 +143,9 @@ class Learner(object):
 
         state = pd.DataFrame.from_dict(stateData)
 
-        print('State DF {}'.format(state.shape))
-        print(state.head())
+        if self.Verbose:
+            print('State DF {}'.format(state.shape))
+            print(state.head())
 
         state = self.ModifyState(state)
 
@@ -128,8 +156,9 @@ class Learner(object):
                                 , norm=self.NormalizationApproach
                                 , axis=self.NormalizationAxis))
 
-        print('State-Normalized')
-        print(state.head())
+        if self.Verbose:
+            print('State-Normalized')
+            print(state.head())
 
         # calculate reward
         reward = self.Reward(state)
@@ -154,16 +183,25 @@ class Learner(object):
         if self.Training:
             explore = self.Train(state)
 
-        # Explore or Exploit for next action (will always exploit when not training)
-        if explore:
-            # pick a random action
-            nextAction = random.randint(0, self.NumberOfActions-1)
-            self.LastActionType = 0
-        else:
-            nextAction = self.Act(state)
-            self.LastActionType = 1
+        if self.LearnerMode == 2:
+            self.LastActionType = -1
+            nextAction = self.ValidationPattern[self.RunDuration % len(self.ValidationPattern)]
+
+        # If not validating, testing or training
+        if self.LearnerMode != 2:
+
+            # Explore or Exploit for next action
+            if explore:
+                # pick a random action
+                nextAction = random.randint(0, self.NumberOfActions-1)
+                self.LastActionType = 0
+            else:
+                nextAction = self.Act(state)
+                self.LastActionType = 1
 
         self.RunDuration += 1
+
+        print('Returning Action {}'.format(nextAction))
 
         return {self.ActionFieldText: nextAction}
 
@@ -175,7 +213,7 @@ class Learner(object):
     def Act(self, state):
         return NotImplementedError
 
-    '''Write out logs for training sessions and the model's criterias'''
+    '''Write out logs for training sessions and the model's criteria'''
     def Conclude(self):
 
         # conclusion time
@@ -184,6 +222,10 @@ class Learner(object):
         # close trace file
         self.CurrentTraceFileDS.flush()
         self.CurrentTraceFileDS.close()
+
+        if self.CurrentDecisionTraceFileName is not None:
+            self.CurrentDecisionTraceFileDS.flush()
+            self.CurrentDecisionTraceFileDS.close()
 
         # Update the run config, read first, close, then reopen to write it back out with new info
         mlconfigFileDS = open(self.ReportFileName, 'r')
@@ -211,25 +253,64 @@ class Learner(object):
 
             actionInfoList[int(action)] = {'mean': avg, 'std': std, 'count': int(count)}
 
-        newFields = {'time-training-started': self.LearnerStartSession.strftime(self.DateFormat),
-                     'time-training-ended': self.LearnerStopSession.strftime(self.DateFormat),
+        # Load the decisions
+        decActionInfoList = dict()
+
+        if self.CurrentDecisionTraceFileName is not None:
+            # Load up decisions logs and stats
+            decLogDF = pd.read_csv(self.CurrentDecisionTraceFileName)
+
+            # Get length of run
+            decIDs = decLogDF['Step'].unique()
+
+            # for each decision step
+            for decStep in decIDs:
+
+                # Get the step's dec process
+                decs = decLogDF[decLogDF['Step'] == decStep]
+
+                selectedAction = decs[decs['Reward'] == decs['Reward'].max()]
+
+                if self.Verbose:
+                    print(selectedAction.head())
+
+                actionID = int(selectedAction[self.ActionFieldText])
+
+                if actionID in decActionInfoList.keys():
+                    decActionInfoList[actionID] += 1
+                else:
+                    decActionInfoList[actionID] = 1
+
+        newFields = {'time-started': self.LearnerStartSession.strftime(self.DateFormat),
+                     'time-ended': self.LearnerStopSession.strftime(self.DateFormat),
                      'runLengthInSteps': self.RunDuration,
-                     'action-breakdown': actionInfoList}
+                     'action-breakdown': actionInfoList,
+                     'decision-breakdown': decActionInfoList}
 
-        if self.Training:
-
-            listOfTrainingEntries = configData['training-sessions']
-
-            listOfTrainingEntries.append(newFields)
-
-            configData['training-sessions'] = listOfTrainingEntries
-        else:
+        if self.LearnerMode == 0:
             # Testing
             listOfTestingEntries = configData['testing-sessions']
 
             listOfTestingEntries.append(newFields)
 
             configData['testing-sessions'] = listOfTestingEntries
+
+        elif self.LearnerMode == 1:
+            # Training
+            listOfTrainingEntries = configData['training-sessions']
+
+            listOfTrainingEntries.append(newFields)
+
+            configData['training-sessions'] = listOfTrainingEntries
+
+        elif self.LearnerMode == 2:
+            # Validating
+            listOfValidationEntries = configData['validation-sessions']
+
+            listOfValidationEntries.append(newFields)
+
+            configData['validation-sessions'] = listOfValidationEntries
+
 
         mlconfigFileDS = open(self.ReportFileName, 'w')
 
@@ -263,18 +344,20 @@ class KerasDelta(Learner):
                  , startVectorFieldNames
                  , endVectorFieldNames
                  , learnerName
-                 , training
+                 , learnerMode
                  , numberOfActions
                  , epsilon
                  , epochs
                  , normalizationApproach
                  , normalizationAxis
+                 , validationPattern = None
                  ):
         inputFieldNames = copy.deepcopy(startVectorFieldNames)
         inputFieldNames.extend(endVectorFieldNames)
         super().__init__(
                         learnerName=learnerName
-                         , training=training
+                         , learnerMode=learnerMode
+                         , validationPattern=validationPattern
                          , numberOfActions=numberOfActions
                          , epsilon=epsilon
                          , inputFieldNames=inputFieldNames
@@ -356,27 +439,34 @@ class KerasDelta(Learner):
 
                 predictedValue = model.predict(test_x)[0][0]
 
-                print('Predicted {} {}'.format(modelname, predictedValue))
-
                 newState[modelname] = [predictedValue]
-                print(newState)
 
 
             # Analyze the predicted new state, do reward calculation
             newStateString = ''
 
             for key in newState.columns:
-                newStateString += '{}:{}'.format(key, newState.iloc[0][key])
-
-            print('Predicted new Action {} State {}'.format(actionID, newStateString))
+                newStateString += '{}:{}|'.format(key, newState.iloc[0][key])
 
             calcReward = self.Reward(newState)
-
-            print('Predicted new Action {} State {} Reward:{}'.format(actionID, newStateString, calcReward))
 
             if calcReward > highestReward:
                 highestReward = calcReward
                 highestRewardingAction = actionID
+
+            if self.Verbose:
+                print('Predicted new Action {} State {} Reward:{}'.format(actionID, newStateString, calcReward))
+
+            logLine = '{},{},{},{},{},{}\n'.format(datetime.datetime.now().strftime(self.DateFormat)
+                                                   , self.RunDuration
+                                                   , actionID
+                                                   , newStateString
+                                                   , calcReward
+                                                   , '')
+
+            self.CurrentDecisionTraceFileDS.write(logLine)
+
+            self.CurrentDecisionTraceFileDS.flush()
 
         # End action For
         return highestRewardingAction

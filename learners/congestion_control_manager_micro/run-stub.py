@@ -9,11 +9,24 @@ import learners.learner_server
 
 if __name__ == '__main__':
 
-    port, address, training = learners.learner_server.parseArgs()
+    port, address, mode, name, validationFilePath = learners.learner_server.parseArgs()
+
+    validationPattern = None
+
+    if name is None:
+        raise Exception('Need learner name')
+
+    if mode == 2 and validationFilePath is not None:
+        validationFileDS = open(validationFilePath, 'r')
+
+        validationPattern = validationFileDS.readlines()
+    elif mode == 2 and validationFilePath is None:
+        raise Exception('Need validation file path for validation mode')
+
 
     # EDIT - Define the learner===========================================
-    from learners.congestion_control_manager_micro.cc_learner_alt import CCLearner
-    learner = CCLearner(training=training)
+    from learners.congestion_control_manager_micro.cc_learner import CCLearner
+    learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPattern)
     # ====================================================================
 
     learners.learner_server.DefineLearner(learner)

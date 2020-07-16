@@ -17,10 +17,19 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
 
         # Start Learners
         for namePortTrain in Learners:
-            modelName = namePortTrain[0]
+            learnerDirName = namePortTrain[0]
             modelPort = namePortTrain[1]
-            modelTrain = namePortTrain[2]
-            LearnersProcs.append(subprocess.Popen(['python3', '{}learners/{}/run-stub.py'.format(dirOffset,modelName), '{}'.format(modelPort), '{}'.format(modelTrain)]))
+            modelMode = namePortTrain[2]
+            learnerName = namePortTrain[3]
+            modelValidationPattern = namePortTrain[4]
+            #learnerAddress = namePortTrain[5]
+            LearnersProcs.append(subprocess.Popen(['python3'
+                                                      , '{}learners/{}/run-stub.py'.format(dirOffset,learnerDirName)
+                                                      , '{}'.format(modelPort)
+                                                      , '{}'.format(modelMode)
+                                                      , '{}'.format(learnerName)
+                                                      , '{}'.format(modelValidationPattern)
+                                                      ]))
 
         print('Learners Setup')
 

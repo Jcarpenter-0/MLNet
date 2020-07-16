@@ -9,8 +9,8 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 import experiments.experiments_common
 
-# Define Learners as tuple (<name of learner>, <port>, <training flag>)
-Learners = [('congestion_control_manager_micro', '8080', '1')
+# Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path>)
+Learners = [('congestion_control_manager_micro', '8080', '1', 'exp-02-cc-learner', './SimpleValidationPattern.txt')
             ]
 
 # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
