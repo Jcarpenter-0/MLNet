@@ -13,8 +13,8 @@ from sklearn import preprocessing
 Verbose = False
 
 # Report Output Header
-TrainFile = '09-07-2020-02-11-05-training-runlogs'
-TestFile = '09-07-2020-03-15-52-training-runlogs'
+TrainFile = '17-07-2020-22-57-33-training-runlogs'
+TestFile = '17-07-2020-23-28-22-training-runlogs'
 
 TARGETVALUEFIELDNAME = 'bps-1'
 
@@ -45,8 +45,8 @@ ReportFileDS.write(ReportHeader)
 ReportFileDS.flush()
 
 # Read in data
-INPUTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/cclearner/traces/{}.csv'.format(TrainFile))
-TESTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/cclearner/traces/{}.csv'.format(TestFile))
+INPUTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/exp-02-cc-learner/traces/{}.csv'.format(TrainFile))
+TESTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/exp-02-cc-learner/traces/{}.csv'.format(TestFile))
 
 # Filter
 DROPFILTER = [TARGETVALUEFIELDNAME, 'Timestamp', 'Reward', 'Exploit']
@@ -64,13 +64,13 @@ n_cols = train_x.shape[1]
 # Do variations of data?
 
 # Training Configs
-Normalizations = [None, 'l2', 'l1']
-NormalizationAxes = [1, 0]
-LayerDensities = range(25, 100, 25)
-HiddenLayerCounts = range(1, 10)
+Normalizations = ['l2', 'l1']
+NormalizationAxes = [1]
+LayerDensities = range(25, 50, 25)
+HiddenLayerCounts = range(1, 4)
 LayerActivations = [
     'relu'
-#    , 'sigmoid'
+    , 'sigmoid'
 #    , 'softmax'
 #    , 'softplus'
 #    , 'softsign'
@@ -86,14 +86,14 @@ LossFunctions = [
 ]
 Optimizers = [
     'adam'
-#    , 'SGD'
+    , 'SGD'
 #    , 'RMSprop'
 #    , 'Adadelta'
 #    , 'Adagrad'
 #    , 'Adamax'
 #    , 'Nadam'
 ]
-Epochs = range(10, 50, 10)
+Epochs = range(10, 70, 10)
 ValidationSplits = [0.2]
 
 Variations = len(LayerDensities) * len(LayerActivations) * len(LossFunctions) * len(Optimizers) * len(Epochs) * len(Normalizations) * len(NormalizationAxes) * len(HiddenLayerCounts) * len(ValidationSplits)

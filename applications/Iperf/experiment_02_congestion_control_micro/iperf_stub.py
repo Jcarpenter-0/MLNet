@@ -91,7 +91,7 @@ for runNum in range(0, runCount):
     respDict = json.loads(response.content.decode())
 
     # Convert action to paras
-    newActionID = respDict['actionID']
+    newActionID = int(respDict['actionID'])
 
     print('Recieved ActionID {}'.format(newActionID))
 
@@ -115,3 +115,4 @@ for runNum in range(0, runCount):
         # default cubic, for ubuntu environments
         iperfArgsDict['-C'] = 'cubic'
         prevActionID = 0
+    print('Prev Action is now {}'.format(prevActionID))

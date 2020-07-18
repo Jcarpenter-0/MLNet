@@ -167,7 +167,7 @@ class Learner(object):
         if self.Training:
             logLine = '{},{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward, self.LastActionType)
         else:
-            logLine = '{},{},'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
+            logLine = '{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
 
         # write out each of the state values
         for key in self.InputFieldNames:

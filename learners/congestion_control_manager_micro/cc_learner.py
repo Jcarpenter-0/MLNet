@@ -16,7 +16,7 @@ class CCLearner(learners.learner_common.KerasDelta):
                                         , validationPattern=validationPattern
                                         , numberOfActions=4
                                         , epsilon=65
-                                        , epochs=24
+                                        , epochs=30
                                         , normalizationApproach='l2'
                                         , normalizationAxis=1)
 
@@ -37,10 +37,11 @@ class CCLearner(learners.learner_common.KerasDelta):
         # Define model
 
         # Input layer
-        model.add(keras.layers.Dense(25, input_shape=(inputCount,), activation='relu'))
+        model.add(keras.layers.Dense(50, input_shape=(inputCount,), activation='relu'))
 
         # Hidden layer
-        model.add(keras.layers.Dense(25, activation='relu'))
+        model.add(keras.layers.Dense(50, activation='relu'))
+        model.add(keras.layers.Dense(50, activation='relu'))
 
         # Output layer
         model.add(keras.layers.Dense(1))
