@@ -18,18 +18,10 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
         # Start Learners
         for namePortTrain in Learners:
             learnerDirName = namePortTrain[0]
-            modelPort = namePortTrain[1]
-            modelMode = namePortTrain[2]
-            learnerName = namePortTrain[3]
-            modelValidationPattern = namePortTrain[4]
-            #learnerAddress = namePortTrain[5]
-            LearnersProcs.append(subprocess.Popen(['python3'
-                                                      , '{}learners/{}/run-stub.py'.format(dirOffset,learnerDirName)
-                                                      , '{}'.format(modelPort)
-                                                      , '{}'.format(modelMode)
-                                                      , '{}'.format(learnerName)
-                                                      , '{}'.format(modelValidationPattern)
-                                                      ]))
+            learnerCommand = ['python3', '{}learners/{}/run-stub.py'.format(dirOffset, learnerDirName)]
+            learnerCommand.extend(namePortTrain[1:])
+
+            LearnersProcs.append(subprocess.Popen(learnerCommand))
 
         print('Learners Setup')
 
@@ -87,3 +79,4 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
                 networkNode.wait()
 
         print('Experiment Done')
+        raise Exception('Experiment Done')

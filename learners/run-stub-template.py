@@ -9,7 +9,7 @@ import learners.learner_server
 
 if __name__ == '__main__':
 
-    port, address, mode, name, validationFilePath, traceFilePrefix = learners.learner_server.parseArgs()
+    port, address, mode, name, validationFilePath = learners.learner_server.parseArgs()
 
     validationPattern = None
 
@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     # EDIT - Define the learner===========================================
     from learners.congestion_control_manager_micro.cc_learner import CCLearner
-    learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPattern, traceFilePrefix=traceFilePrefix)
+    learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPattern)
     # ====================================================================
 
     learners.learner_server.DefineLearner(learner)

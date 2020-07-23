@@ -1,14 +1,13 @@
 import os
 import json
 import pandas as pd
-import numpy as np
 import datetime
 import random
 import copy
 from sklearn import preprocessing
 
 '''Base Class'''
-class Learner(object):
+class ReinforcementLearner(object):
 
     """Learner Definition
     learnerMode = Mode to set the learner in, 0=testing, 1=training, 2=validating"""
@@ -21,6 +20,8 @@ class Learner(object):
                  , inputFieldNames
                  , normalizationApproach
                  , normalizationAxis
+                 , traceFilePrefix
+                 , fieldsExemptFromNormalization=[]
                  ):
 
         self.LearnerName = learnerName
@@ -38,25 +39,29 @@ class Learner(object):
         self.LearnerMode = learnerMode
         self.Verbose = False
         self.NumberOfActions = numberOfActions
-        self.LastActionType = 0
 
         self.Epsilon = epsilon
         self.NormalizationApproach = normalizationApproach
         self.NormalizationAxis = normalizationAxis
+        self.FieldsExemptFromNormalization = fieldsExemptFromNormalization
 
         # Start time of the learner's session
         self.LearnerStartSession = datetime.datetime.now()
 
         # Some field Constants
-        self.ActionFieldText = 'actionID'
+        self.ActionFieldText = 'actionID-{}'
+        self.ReturnBodyText = 'actionID'
         self.DateFormat = "%d-%m-%Y-%H-%M-%S"
         self.CoreFolderRoot = './tmp/' + learnerName + '/'
         self.ModelFolderRoot = self.CoreFolderRoot + 'models/'
         self.TracesFolderRoot = self.CoreFolderRoot + 'traces/'
         self.ReportFileName = self.CoreFolderRoot + learnerName + '-report.json'
 
-        self.CurrentTraceFileHeaders = 'Timestamp,Reward'
-        self.CurrentDecisionTraceFileHeaders = 'Timestamp,Step,{},Predicted-State,Reward,Input-State\n'.format(self.ActionFieldText)
+        self.CurrentTraceFileHeaders = ['Timestamp', 'Reward']
+        self.CurrentDecisionTraceFileHeaders = ['Timestamp', 'Step', 'ActionID', 'Predicted-State', 'Reward', 'Input-State']
+
+        # Add the state fields
+        self.CurrentTraceFileHeaders.extend(inputFieldNames)
 
         # Set to Nones at first, then populate via mode
         self.CurrentDecisionTraceFileName = None
@@ -64,27 +69,20 @@ class Learner(object):
         # Setup for the modes
         if self.LearnerMode == 0:
             # Testing
-            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-testing-runlogs.csv'.format(
-                self.LearnerStartSession.strftime(self.DateFormat))
-            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-testing-declog.csv'.format(
-                self.LearnerStartSession.strftime(self.DateFormat))
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-{}-testing-runlogs.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat), traceFilePrefix)
+            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-{}-testing-declog.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat), traceFilePrefix)
 
         elif self.LearnerMode == 1:
             # Training
-            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-training-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
-            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-training-declog.csv'.format(self.LearnerStartSession.strftime(self.DateFormat))
-            self.CurrentTraceFileHeaders += ',Exploit'
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-{}-training-runlogs.csv'.format(self.LearnerStartSession.strftime(self.DateFormat), traceFilePrefix)
+            self.CurrentDecisionTraceFileName = self.TracesFolderRoot + '{}-{}-training-declog.csv'.format(self.LearnerStartSession.strftime(self.DateFormat), traceFilePrefix)
 
         elif self.LearnerMode == 2:
             # Validating
-            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-validation-runlogs.csv'.format(
-                self.LearnerStartSession.strftime(self.DateFormat))
-
-        # Add extra state headers
-        for inputField in self.InputFieldNames:
-            self.CurrentTraceFileHeaders += ',' + inputField
-
-        self.CurrentTraceFileHeaders += '\n'
+            self.CurrentTraceFileName = self.TracesFolderRoot + '{}-{}-validation-runlogs.csv'.format(
+                self.LearnerStartSession.strftime(self.DateFormat), traceFilePrefix)
 
         # Ensure folder creation
         os.makedirs(self.CoreFolderRoot, exist_ok=True)
@@ -93,12 +91,34 @@ class Learner(object):
 
         # Setup trace files
         self.CurrentTraceFileDS = open(self.CurrentTraceFileName, 'w')
-        self.CurrentTraceFileDS.write(self.CurrentTraceFileHeaders)
+
+        self.CurrentTraceFileHeaderString = ''
+
+        for index, header in enumerate(self.CurrentTraceFileHeaders):
+            self.CurrentTraceFileHeaderString += header
+
+            if index < len(self.CurrentTraceFileHeaders):
+                self.CurrentTraceFileHeaderString += ','
+
+        self.CurrentTraceFileHeaderString += '\n'
+
+        self.CurrentTraceFileDS.write(self.CurrentTraceFileHeaderString)
         self.CurrentTraceFileDS.flush()
 
         if self.CurrentDecisionTraceFileName is not None:
             self.CurrentDecisionTraceFileDS = open(self.CurrentDecisionTraceFileName, 'w')
-            self.CurrentDecisionTraceFileDS.write(self.CurrentDecisionTraceFileHeaders)
+
+            self.CurrentDecisionTraceFileHeadersString = ''
+
+            for index, header in enumerate(self.CurrentDecisionTraceFileHeaders):
+                self.CurrentDecisionTraceFileHeadersString += header
+
+                if index < len(self.CurrentDecisionTraceFileHeaders):
+                    self.CurrentDecisionTraceFileHeadersString += ','
+
+            self.CurrentDecisionTraceFileHeadersString += '\n'
+
+            self.CurrentDecisionTraceFileDS.write(self.CurrentDecisionTraceFileHeadersString)
             self.CurrentDecisionTraceFileDS.flush()
 
         # Setup the Configurations File
@@ -130,48 +150,62 @@ class Learner(object):
 
         return descriptionDict
 
+    def ModifyState(self, state):
+        """Modify the state, if at all before normalization and training/acting. State is panda dataframe and expects to return one."""
+        return state
+
     '''Take in stateData (as a Python Dict), return a command structure (as a Python Dict)'''
     def Operate(self, stateData):
-        # do potential state conversion
 
-        # convert stateData (python dict) to pandas dataframe
+        # Dictionary for logging
+        logDict = stateData.copy()
 
         # prep for conversion
         for key in stateData.keys():
             # box into lists each entry
             stateData[key] = [stateData[key]]
 
+        # Convert to data frame for training
         state = pd.DataFrame.from_dict(stateData)
+
+        # only keep the fields defined for the learner for training/testing
+        state = state[self.InputFieldNames]
+
+        state = self.ModifyState(state)
 
         if self.Verbose:
             print('State DF {}'.format(state.shape))
             print(state.head())
 
-        state = self.ModifyState(state)
-
-        # Do potential normalization
+        # Do potential normalization, for training
         if self.NormalizationApproach is not None:
-            state = pd.DataFrame(columns=state.columns
-                                , data=preprocessing.normalize(state.values
+            # extract fields needed for normalization
+            normalizeDF = state.copy()
+            normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
+
+            normalizeDF = pd.DataFrame(columns=normalizeDF.columns
+                                , data=preprocessing.normalize(normalizeDF.values
                                 , norm=self.NormalizationApproach
                                 , axis=self.NormalizationAxis))
 
-        if self.Verbose:
-            print('State-Normalized')
-            print(state.head())
+            # return normalized fields to regular state
+            for column in normalizeDF.columns:
+                state[column] = normalizeDF[column]
+
+            if self.Verbose:
+                print('State-Normalized')
+                print(state.head())
 
         # calculate reward
-        reward = self.Reward(state)
+        logDict['Reward'] = self.Reward(state)
+        logDict['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
+        logDict['Step'] = self.RunDuration
 
-        # write out trace file
-        if self.Training:
-            logLine = '{},{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward, self.LastActionType)
-        else:
-            logLine = '{},{}'.format(datetime.datetime.now().strftime(self.DateFormat), reward)
+        logLine = ''
 
         # write out each of the state values
-        for key in self.InputFieldNames:
-            logLine += ',{}'.format(stateData[key][0])
+        for key in self.CurrentTraceFileHeaders:
+            logLine += '{},'.format(logDict[key])
 
         self.CurrentTraceFileDS.write('{}\n'.format(logLine))
 
@@ -184,7 +218,6 @@ class Learner(object):
             explore = self.Train(state)
 
         if self.LearnerMode == 2:
-            self.LastActionType = -1
             nextAction = self.ValidationPattern[self.RunDuration % len(self.ValidationPattern)]
 
         # If not validating, testing or training
@@ -194,16 +227,12 @@ class Learner(object):
             if explore:
                 # pick a random action
                 nextAction = random.randint(0, self.NumberOfActions-1)
-                self.LastActionType = 0
             else:
                 nextAction = self.Act(state)
-                self.LastActionType = 1
 
         self.RunDuration += 1
 
-        print('Returning Action {}'.format(nextAction))
-
-        return {self.ActionFieldText: nextAction}
+        return {self.ReturnBodyText: nextAction}
 
     """Fit model with data from the state (as a pandas dataframe)"""
     def Train(self, state):
@@ -237,55 +266,26 @@ class Learner(object):
         # load in the run logs for this current run and then get the values of a reward
         runLogDF = pd.read_csv(self.CurrentTraceFileName)
 
-        actions = runLogDF[self.ActionFieldText].unique()
-
+        # Get the reward performance of each action
         actionInfoList = dict()
 
-        for action in actions:
-            # get specific action stats
-            actionDF = runLogDF[runLogDF[self.ActionFieldText] == action]
-
+        for index in range(0, self.NumberOfActions):
+            actionField = self.ActionFieldText.format(index)
+            actionDF = runLogDF[runLogDF[actionField] == 1]
             rewardDF = actionDF['Reward']
 
             std = rewardDF.std()
             avg = rewardDF.mean()
             count = rewardDF.count()
 
-            actionInfoList[int(action)] = {'mean': avg, 'std': std, 'count': int(count)}
+            actionInfoList[int(index)] = {'mean': avg, 'std': std, 'count': int(count)}
 
-        # Load the decisions
-        decActionInfoList = dict()
-
-        if self.CurrentDecisionTraceFileName is not None:
-            # Load up decisions logs and stats
-            decLogDF = pd.read_csv(self.CurrentDecisionTraceFileName)
-
-            # Get length of run
-            decIDs = decLogDF['Step'].unique()
-
-            # for each decision step
-            for decStep in decIDs:
-
-                # Get the step's dec process
-                decs = decLogDF[decLogDF['Step'] == decStep]
-
-                selectedAction = decs[decs['Reward'] == decs['Reward'].max()]
-
-                if self.Verbose:
-                    print(selectedAction.head())
-
-                actionID = int(selectedAction[self.ActionFieldText])
-
-                if actionID in decActionInfoList.keys():
-                    decActionInfoList[actionID] += 1
-                else:
-                    decActionInfoList[actionID] = 1
 
         newFields = {'time-started': self.LearnerStartSession.strftime(self.DateFormat),
                      'time-ended': self.LearnerStopSession.strftime(self.DateFormat),
+                     'trace-file': self.CurrentTraceFileName,
                      'runLengthInSteps': self.RunDuration,
-                     'action-breakdown': actionInfoList,
-                     'decision-breakdown': decActionInfoList}
+                     'action-breakdown': actionInfoList}
 
         if self.LearnerMode == 0:
             # Testing
@@ -324,10 +324,6 @@ class Learner(object):
     def Reward(self, stateData):
         return NotImplementedError
 
-    # Possibly trim the state here or modify if you wish
-    def ModifyState(self, stateData):
-        return stateData
-
 '''Keras implementation of a multi-model future state predictive algorithm'''
 '''Takes in a starter vector plus finish vector with action transition'''
 
@@ -335,7 +331,7 @@ class Learner(object):
 '''https://towardsdatascience.com/building-a-deep-learning-model-using-keras-1548ca149d37'''
 '''https://stats.stackexchange.com/questions/284189/simple-linear-regression-in-keras'''
 ''''''
-class KerasDelta(Learner):
+class KerasDelta(ReinforcementLearner):
 
     """Start Vector is the initial values or a first run state
     End Vector is the values of a second run to contrast with first run, plus the action that got there
@@ -350,6 +346,8 @@ class KerasDelta(Learner):
                  , epochs
                  , normalizationApproach
                  , normalizationAxis
+                 , traceFilePrefix
+                 , fieldsExemptFromNormalization=[]
                  , validationPattern = None
                  ):
         inputFieldNames = copy.deepcopy(startVectorFieldNames)
@@ -363,6 +361,8 @@ class KerasDelta(Learner):
                          , inputFieldNames=inputFieldNames
                         , normalizationAxis=normalizationAxis
                         , normalizationApproach=normalizationApproach
+                        , traceFilePrefix=traceFilePrefix
+                        , fieldsExemptFromNormalization=fieldsExemptFromNormalization
         )
 
         self.Epochs = epochs
@@ -435,7 +435,12 @@ class KerasDelta(Learner):
                 test_x = state.copy()
                 test_x = test_x.drop(columns=self.EndVectorFieldNames)
                 # Set action id
-                test_x[self.ActionFieldText] = [actionID]
+                # blank the other actions
+
+                for subActID in range(0, self.NumberOfActions):
+                    test_x[self.ActionFieldText.format(subActID)] = [0]
+
+                test_x[self.ActionFieldText.format(actionID)] = [1]
 
                 predictedValue = model.predict(test_x)[0][0]
 
@@ -462,7 +467,7 @@ class KerasDelta(Learner):
                                                    , actionID
                                                    , newStateString
                                                    , calcReward
-                                                   , '')
+                                                   , state.to_dict())
 
             self.CurrentDecisionTraceFileDS.write(logLine)
 

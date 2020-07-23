@@ -6,10 +6,10 @@ from sklearn import preprocessing
 # Useful Notes:
 # sysctl net.ipv4.tcp_available_congestion_control - displays cc's available on host
 
-class CCLearner(learners.learner_common.KerasDelta):
+class HttpCacheLearner(learners.learner_common.KerasDelta):
 
-    def __init__(self, learnerName, learnerMode, validationPattern, traceFilePrefix):
-        super(CCLearner, self).__init__(startVectorFieldNames=['bps-0', 'retransmits-0'
+    def __init__(self, learnerName, learnerMode, validationPattern):
+        super(HttpCacheLearner, self).__init__(startVectorFieldNames=['bps-0', 'retransmits-0'
             , 'actionID-0'
             , 'actionID-1'
             , 'actionID-2'
@@ -23,7 +23,6 @@ class CCLearner(learners.learner_common.KerasDelta):
                                         , epochs=30
                                         , normalizationApproach='l2'
                                         , normalizationAxis=1
-                                        , traceFilePrefix=traceFilePrefix
                                         , fieldsExemptFromNormalization=['actionID-0'
                                                                         , 'actionID-1'
                                                                         , 'actionID-2'

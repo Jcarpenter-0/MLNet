@@ -11,6 +11,9 @@ import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 
+import applications.application_common
+import applications.Iperf.Iperf
+
 runCount = int(sys.argv[1])
 
 # Get learner endpoint
@@ -42,28 +45,14 @@ iperfArgsDict['-J'] = None
 
 # Hold the previous action here, but set a default first
 prevActionID = 0
-
-# Run multiple times
-
-StartVector = {'bps-0':0, 'retransmits-0':0}
+StartVector = {'bps-0': 0, 'retransmits-0': 0}
 
 for runNum in range(0, runCount):
 
-    iperfCommand = []
-
-    # Assemble the command for execution from the dict
-    for para in iperfArgsDict.keys():
-        iperfCommand.append(para)
-
-        if iperfArgsDict[para] is not None:
-            iperfCommand.append(iperfArgsDict[para])
+    iperfCommand = applications.application_common.ConvertArgDictToArgList(iperfArgsDict)
 
     # Run Iperf with initial args
-    iperfProcResult = subprocess.check_output(iperfCommand)
-
-    # Get result, decode from JSON to a dict
-    iperfProcResult = iperfProcResult.decode()
-    iperfProcResultDict = json.loads(iperfProcResult)
+    iperfProcResultDict = applications.Iperf.Iperf.RunIperf(iperfCommand)
 
     # Prune from the dict what you only want to send
     sendDict = dict()
@@ -73,25 +62,15 @@ for runNum in range(0, runCount):
     sendDict['bps-0'] = StartVector['bps-0']
     sendDict['retransmits-0'] = StartVector['retransmits-0']
 
-    # Append the actionID of the action taken
-    sendDict['actionID'] = prevActionID
-
-    # Encode from dict to JSON again
-    jsonData = json.dumps(sendDict)
+    # Send action info
+    sendDict = applications.application_common.SetActionBinaries(prevActionID, 4, sendDict)
 
     # Update the start vector
     StartVector['bps-0'] = sendDict['bps-1']
     StartVector['retransmits-0'] = sendDict['retransmits-1']
 
-    # Send to learner, and get new action
-    print('Sending {}'.format(sendDict))
-
-    response = requests.post(learner, data=jsonData)
-
-    respDict = json.loads(response.content.decode())
-
     # Convert action to paras
-    newActionID = int(respDict['actionID'])
+    newActionID = applications.application_common.SendToLearner(sendDict, learner)
 
     print('Recieved ActionID {}'.format(newActionID))
 
@@ -111,6 +90,24 @@ for runNum in range(0, runCount):
         # reno
         iperfArgsDict['-C'] = 'reno'
         prevActionID = 3
+    elif newActionID == 4:
+        iperfArgsDict['-C'] = 'westwood'
+        prevActionID = 4
+    elif newActionID == 5:
+        iperfArgsDict['-C'] = 'lp'
+        prevActionID = 5
+    elif newActionID == 6:
+        iperfArgsDict['-C'] = 'bic'
+        prevActionID = 6
+    elif newActionID == 7:
+        iperfArgsDict['-C'] = 'htcp'
+        prevActionID = 7
+    elif newActionID == 8:
+        iperfArgsDict['-C'] = 'veno'
+        prevActionID = 8
+    elif newActionID == 9:
+        iperfArgsDict['-C'] = 'illinois'
+        prevActionID = 9
     else:
         # default cubic, for ubuntu environments
         iperfArgsDict['-C'] = 'cubic'

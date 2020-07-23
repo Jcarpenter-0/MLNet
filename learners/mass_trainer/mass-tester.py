@@ -64,8 +64,13 @@ n_cols = train_x.shape[1]
 # Do variations of data?
 
 # Training Configs
-Normalizations = ['l2', 'l1']
+Normalizations = [
+#                None
+                 'l2'
+                , 'l1'
+]
 NormalizationAxes = [1]
+NormalizationFieldExemptions = ['actionID-0', 'actionID-1', 'actionID-2', 'actionID-3']
 LayerDensities = range(25, 50, 25)
 HiddenLayerCounts = range(1, 4)
 LayerActivations = [
@@ -213,8 +218,43 @@ for normalizationApproach in Normalizations:
         for normalizationAxis in NormalizationAxes:
 
             # for each column, normalize then add to a data frame
-            normalizedTrain_x = pd.DataFrame(columns=train_x.columns, data=preprocessing.normalize(train_x.values, norm=normalizationApproach, axis=normalizationAxis))
-            normalizedTrain_y = pd.DataFrame(columns=train_y.columns, data=preprocessing.normalize(train_y.values, norm=normalizationApproach, axis=normalizationAxis))
+            normalizedTrain_x = train_x.copy()
+            nrmtrainX = normalizedTrain_x.drop(columns=NormalizationFieldExemptions)
+
+            nrmtrainX = pd.DataFrame(columns=nrmtrainX.columns
+                                , data=preprocessing.normalize(nrmtrainX.values
+                                , norm=normalizationApproach
+                                , axis=normalizationAxis))
+
+            # return normalized fields to regular state
+            for column in nrmtrainX.columns:
+                normalizedTrain_x[column] = nrmtrainX[column]
+
+            normalizedTrain_y = train_y.copy()
+            nrmtrainY = normalizedTrain_y.drop(columns=NormalizationFieldExemptions)
+
+            nrmtrainY = pd.DataFrame(columns=nrmtrainY.columns
+                                , data=preprocessing.normalize(nrmtrainY.values
+                                , norm=normalizationApproach
+                                , axis=normalizationAxis))
+
+            # return normalized fields to regular state
+            for column in nrmtrainY.columns:
+                normalizedTrain_y[column] = nrmtrainY[column]
+
+            normalizedTest_x = test_x.copy()
+            nrmtestX = normalizedTest_x.drop(columns=NormalizationFieldExemptions)
+
+            nrmtestX = pd.DataFrame(columns=nrmtestX.columns
+                                , data=preprocessing.normalize(nrmtestX.values
+                                , norm=normalizationApproach
+                                , axis=normalizationAxis))
+
+            # return normalized fields to regular state
+            for column in nrmtestX.columns:
+                normalizedTest_x[column] = nrmtestX[column]
+
+
             normalizedTest_x = pd.DataFrame(columns=test_x.columns, data=preprocessing.normalize(test_x.values, norm=normalizationApproach, axis=normalizationAxis))
             normalizedTest_y = pd.DataFrame(columns=test_y.columns, data=preprocessing.normalize(test_y.values, norm=normalizationApproach, axis=normalizationAxis))
 
