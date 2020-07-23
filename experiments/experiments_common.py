@@ -79,4 +79,3 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
                 networkNode.wait()
 
         print('Experiment Done')
-        raise Exception('Experiment Done')
