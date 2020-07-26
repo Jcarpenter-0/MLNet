@@ -6,7 +6,10 @@ import json
 LearnersProcs = []
 NetworkNodeProcs = []
 
-def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerCool, KillTimeout, dirOffset='./'):
+def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerCool, KillTimeout, dirOffset='./', keyboardInterupRaise=False):
+
+    keyBoardInterupted = False
+
     try:
 
         # Start Network
@@ -44,10 +47,10 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
         # Wait
         time.sleep(TestingDuration)
 
-    except KeyboardInterrupt:
-        print('')
+    except KeyboardInterrupt as inter:
+        keyBoardInterupted = True
     except Exception as ex:
-        print('')
+        print(str(ex))
     finally:
         # Stop applications
         for applicationTargetDef in Applications:
@@ -79,3 +82,5 @@ def runExperiment(NetworkNodes, Learners, Applications, TestingDuration, ServerC
                 networkNode.wait()
 
         print('Experiment Done')
+        if keyboardInterupRaise and keyBoardInterupted:
+            raise KeyboardInterrupt

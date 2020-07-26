@@ -25,9 +25,6 @@ initialArgs = sys.argv[3].split(' ')
 # Convert to args dict
 iperfArgsDict = dict()
 
-# Setup the commands
-iperfArgsDict['iperf3'] = None
-
 # Parse the initial args to setup the command
 for initialIperfArg in initialArgs:
     argPieces = initialIperfArg.split('|')
@@ -72,8 +69,6 @@ for runNum in range(0, runCount):
     # Convert action to paras
     newActionID = applications.application_common.SendToLearner(sendDict, learner)
 
-    print('Recieved ActionID {}'.format(newActionID))
-
     if newActionID == 0:
         # cubic
         iperfArgsDict['-C'] = 'cubic'
@@ -112,4 +107,3 @@ for runNum in range(0, runCount):
         # default cubic, for ubuntu environments
         iperfArgsDict['-C'] = 'cubic'
         prevActionID = 0
-    print('Prev Action is now {}'.format(prevActionID))

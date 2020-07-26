@@ -3,6 +3,16 @@ import subprocess
 import json
 import requests
 
+# Setup the dir
+DirOffset = '../../'
+
+import os
+import sys
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, DirOffset)
+
+import applications.application_common
+
 
 def RunPing(pingArgsList):
     """Run Ping command and return results in Json format"""
@@ -17,6 +27,8 @@ def RunPing(pingArgsList):
 
     # Contact learner endpoint with data from ping
     pingOutput = pingOutput.decode()
+
+    print('Ping Output: {}'.format(pingOutput))
 
     returnDict = dict()
 
@@ -33,10 +45,10 @@ def RunPing(pingArgsList):
     packetLine = pingOutputLines[3].split(' ')
     returnDict['packetsTransmitted'] = packetLine[0]
     returnDict['packetsReceived'] = packetLine[3]
-    returnDict['packetLoss'] = packetLine[5]
+    returnDict['packetLoss'] = packetLine[5].replace('%','')
     returnDict['time'] = packetLine[-1]
 
-    statLine = pingOutputLines[-1].split(' ')[3].split('/')
+    statLine = pingOutputLines[4].split(' ')[3].split('/')
 
     returnDict['rttMin'] = statLine[0]
     returnDict['rttAvg'] = statLine[1]
@@ -50,9 +62,51 @@ def RunPing(pingArgsList):
 if __name__ == '__main__':
 
     # Parse the args
-    pingArgs = sys.argv[1:-1]
+    pingArgs = sys.argv[1:-2]
+
+    # create a pingArgs dictionary so the values can be accessed and edited
+    pingArgsDict = dict()
+
+    lastArg = None
+
+    for pingArg in pingArgs:
+        if '-' in pingArg and lastArg is None:
+            pingArgsDict[pingArg] = None
+        elif '-' not in pingArg and lastArg is not None:
+            pingArgsDict[lastArg] = pingArg
+            lastArg = None
+        elif '-' not in pingArg and lastArg is None:
+            pingArgsDict['destination'] = pingArg
 
     # Parse the learner target
-    learnerTarget = sys.argv[-1]
+    try:
+        learnerTarget = sys.argv[-1]
+    except:
+        learnerTarget = None
 
-    result = RunPing(pingArgs)
+    runCount = int(sys.argv[-2])
+
+    # run n times, allows the controller to "explore" the environment
+    for runNum in range(0, runCount):
+
+        result = RunPing(pingArgs)
+
+        # add the command inputs to the result
+        result.update(pingArgsDict)
+
+        # Send to the learner
+        if learnerTarget is not None:
+            response = applications.application_common.SendToLearnerL(result, learnerTarget)
+
+            # Update args
+            for key in response.keys():
+                pingArgsDict[key] = response[key]
+
+            # rebuild the ping args list using new paras
+            pingArgs = []
+
+            for arg in pingArgsDict.keys():
+                pingArgs.append(arg)
+
+                if pingArgsDict[arg] is not None:
+                    pingArgs.append(pingArgsDict[arg])

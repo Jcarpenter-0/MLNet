@@ -18,7 +18,7 @@ NetworkNodes = [['mm-delay', '20', 'python3', DirOffset + 'applications/operatio
                 ]
 
 # Define Applications as tuple (<host address>, <[args to the application]>)
-Applications = [('http://100.64.0.2:8081', ['python3', DirOffset + 'applications/Ping/Ping.py', '100.64.0.1', '-c', '10', '-s', '56', '-t', '255', '1000', 'http://100.64.0.1:8080'])
+Applications = [('http://100.64.0.2:8081', ['python3', DirOffset + 'applications/Ping/Ping.py', '100.64.0.1', '1000', 'http://100.64.0.1:8080'])
                 ]
 
 experiments.experiments_common.runExperiment(NetworkNodes, Learners, Applications, 1800, 10, 10, DirOffset)

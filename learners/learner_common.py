@@ -170,6 +170,7 @@ class ReinforcementLearner(object):
 
         # only keep the fields defined for the learner for training/testing
         state = state[self.InputFieldNames]
+        rawState = pd.DataFrame.copy(state)
 
         state = self.ModifyState(state)
 
@@ -228,7 +229,7 @@ class ReinforcementLearner(object):
                 # pick a random action
                 nextAction = random.randint(0, self.NumberOfActions-1)
             else:
-                nextAction = self.Act(state)
+                nextAction = self.Act(state, rawState)
 
         self.RunDuration += 1
 
@@ -239,7 +240,7 @@ class ReinforcementLearner(object):
         return NotImplementedError
 
     """Apply the model to data from state (as a pandas dataframe) to make the next action"""
-    def Act(self, state):
+    def Act(self, state, rawState=None):
         return NotImplementedError
 
     '''Write out logs for training sessions and the model's criteria'''
@@ -475,3 +476,178 @@ class KerasDelta(ReinforcementLearner):
 
         # End action For
         return highestRewardingAction
+
+class KerasBlackBox(ReinforcementLearner):
+    """Take in inputs, define action space, learn target fields"""
+    """Action Fields are defined as dict(nameofField, rangeOfpossiblevalues)"""
+    def __init__(self
+                 , learnerName
+                 , learnerMode
+                 , validationPattern
+                 , epsilon
+                 , inputFieldNames
+                 , acitonFields
+                 , targetFields
+                 , epochs
+                 ,normalizationApproach, normalizationAxis, traceFilePrefix):
+        super().__init__(learnerName, learnerMode, validationPattern, 0, epsilon, inputFieldNames,
+                         normalizationApproach, normalizationAxis, traceFilePrefix)
+
+        self.Epochs = epochs
+        self.ActionFields = acitonFields
+        self.TargetFields = targetFields
+
+        # Models
+        self.ModelReferences = dict()
+
+        # Feed in list of strings, the names of all the fields expected
+        # The model names will be the patterns of fields and actions
+        inputCount = len(inputFieldNames) - len(targetFields)
+
+        # Generate modelnames
+        # Model naming scheme, 'predictedvariable'
+        # Example: 'retransmits'
+        for endVector in targetFields:
+            # Take a field, and then create a sequence of the other fields
+            self.ModelReferences[endVector] = self.BaseModelGeneration(endVector, inputCount)
+
+    def BaseModelGeneration(self, modelName, inputCount):
+        '''Return new instance of a keras model, fully compiled'''
+        return NotImplementedError
+
+    def Train(self, state):
+        '''Hand the state off to each of the models'''
+        for modelname in self.ModelReferences.keys():
+            model = self.ModelReferences[modelname]
+
+            # Get target values
+            train_y = state[modelname]
+
+            # Make dataframe of state, without the targeted field
+            train_x = state.copy()
+            train_x = train_x.drop(columns=self.TargetFields)
+
+            # Fit action to reward, so that given an action we can see the potential impact
+            trainingResult = model.fit(train_x, train_y
+                                       , epochs=self.Epochs
+                                       , verbose=self.Verbose)
+
+            # Save model out
+            model.save(self.ModelFolderRoot + modelname)
+
+        # Return explore/exploit
+        return random.randint(1, 100) <= self.Epsilon
+
+    def Reward(self, stateData):
+        return NotImplementedError
+
+    def Act(self, state, rawState):
+        """Receive the state (dataframe) and stateData (raw state dataframe) and then act. You only need the raw dataframe if normalizing on the state."""
+
+        # List to hold what action para is to be used, will be n entries where n is number of action paras
+        actionIndices = []
+
+        for actionFieldNum in range(0, len(self.ActionFields)):
+            actionIndices.append(0)
+
+        # Get number of possible actions
+        numberOfPossibleActions = 1
+
+        for inputField in self.ActionFields.keys():
+            inputFieldValues = self.ActionFields[inputField]
+
+            numberOfPossibleActions = numberOfPossibleActions * len(inputFieldValues)
+
+        # action para patterns
+        inputPatterns = []
+
+        # for all possible patterns of input paras
+        for currentActionParaPatternIndex in range(0, numberOfPossibleActions):
+
+            inputPatternDataFrame = pd.DataFrame()
+
+            # for every action and value of actions
+            for index, actionField in enumerate(self.ActionFields.keys()):
+                actionFieldInputRange = self.ActionFields[actionField]
+
+                inputPlace = actionIndices[index]
+
+                # check for wraparound
+                if inputPlace != 0 and inputPlace % len(actionFieldInputRange) == 0:
+                    actionIndices[index] = 0
+                    inputPlace = 0
+
+                    # increase the previous input's place as well
+                    if index != 0:
+                        actionIndices[index-1] += 1
+
+                inputPatternDataFrame[actionField] = actionFieldInputRange[inputPlace]
+
+                # increment the action indices
+                actionIndices[index] += 1
+
+            inputPatterns.append(inputPatternDataFrame)
+
+
+        # Go through all the possible input patterns and see what one gives highest reward
+        highestRewardValue = -1
+        highestRewardIndex = -1
+
+        for inputIndex, inputPatternDataFrame in enumerate(inputPatterns):
+
+            newState = pd.DataFrame()
+
+            for modelname in self.ModelReferences.keys():
+                model = self.ModelReferences[modelname]
+
+                # Make dataframe of state, without the targeted field
+                if self.NormalizationApproach is not None:
+                    # copy the raw unormalized state so it can be normalized with actions
+                    test_x = rawState.copy()
+                else:
+                    # Copy the non-normalized state, as we are not normalizing it
+                    test_x = state.copy()
+
+                test_x = test_x.drop(columns=self.TargetFields)
+
+                # append the inputPattern
+                for col in inputPatternDataFrame.columns:
+                    test_x[col] = inputPatternDataFrame[col]
+
+                # if normalizing, append the columns, then drop exempt ones, normalize, re-add exempts
+                if self.NormalizationApproach is not None:
+                    # extract fields needed for normalization
+                    normalizeDF = test_x.copy()
+                    normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
+
+                    normalizeDF = pd.DataFrame(columns=normalizeDF.columns
+                                               , data=preprocessing.normalize(normalizeDF.values
+                                            , norm=self.NormalizationApproach
+                                            , axis=self.NormalizationAxis))
+
+                    # return normalized fields to regular state
+                    for column in normalizeDF.columns:
+                        test_x[column] = normalizeDF[column]
+
+                predictedValue = model.predict(test_x)[0][0]
+
+                newState[modelname] = [predictedValue]
+
+            # calculate the reward
+            rewardCalculatedFromPrediction = self.Reward(newState)
+
+            if rewardCalculatedFromPrediction > highestRewardValue:
+                highestRewardIndex = inputIndex
+                highestRewardValue = rewardCalculatedFromPrediction
+
+            # log the predicted state for the input state
+
+        returnDict = dict()
+
+        highestRewardDF = inputPatterns[highestRewardIndex]
+
+        for actionField in self.ActionFields.keys():
+            returnDict[actionField] = highestRewardDF[actionField].values[0]
+
+        return returnDict
+

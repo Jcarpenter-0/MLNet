@@ -14,9 +14,10 @@ import signal
 
 Learner = None
 
-def parseArgs():
+def parseArgs(verbose=False):
     # Parse Args
-    print('sys args:' + str(sys.argv))
+    if verbose:
+        print('sys args:' + str(sys.argv))
     port = int(sys.argv[1])
     address = ''
     try:

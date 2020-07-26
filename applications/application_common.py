@@ -39,9 +39,10 @@ def SetActionBinaries(actionID, totalActions, dataDict):
     return dataDict
 
 """Send pythonDict as json to the post reception of a learner server"""
-def SendToLearner(dataDict, learnerTarget):
+def SendToLearner(dataDict, learnerTarget, verbose=False):
     # Send to learner, and get new action
-    print('Sending {}'.format(dataDict))
+    if verbose:
+        print('Sending {}'.format(dataDict))
 
     # Encode from dict to JSON again
     jsonData = json.dumps(dataDict)
@@ -50,4 +51,24 @@ def SendToLearner(dataDict, learnerTarget):
 
     respDict = json.loads(response.content.decode())
 
+    if verbose:
+        print('received {}'.format(respDict))
+
     return int(respDict['actionID'])
+
+def SendToLearnerL(dataDict, learnerTarget, verbose=False):
+    # Send to learner, and get new action
+    if verbose:
+        print('Sending {}'.format(dataDict))
+
+    # Encode from dict to JSON again
+    jsonData = json.dumps(dataDict)
+
+    response = requests.post(learnerTarget, data=jsonData)
+
+    respDict = json.loads(response.content.decode())
+
+    if verbose:
+        print('received {}'.format(respDict))
+
+    return respDict
