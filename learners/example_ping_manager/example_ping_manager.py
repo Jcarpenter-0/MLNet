@@ -5,7 +5,10 @@ import os
 class Learner(learners.learner_common.KerasBlackBox):
 
     def __init__(self, learnerName, learnerMode, validationPattern, traceFilePrefix):
-        super().__init__(learnerName, learnerMode, validationPattern
+        super().__init__(
+            learnerName=learnerName,
+            learnerMode=learnerMode,
+            validationPattern=validationPattern
                          , epsilon=65
                          , inputFieldNames=[
                     "-c",
@@ -14,7 +17,7 @@ class Learner(learners.learner_common.KerasBlackBox):
                     "packetLoss",
                     "rttAvg"
             ]
-                         , acitonFields={
+                         , actionFields={
                     "-c": [10],
                     "-s": range(56, 896, 56),
                     "-t": [255]
@@ -24,9 +27,10 @@ class Learner(learners.learner_common.KerasBlackBox):
                     "rttAvg"
             ]
                          , epochs=24
-                         , normalizationApproach=None
-                         , normalizationAxis=None
-                         , traceFilePrefix=traceFilePrefix)
+                         , normalizationApproach='l2'
+                         , normalizationAxis=1
+                         , traceFilePrefix=traceFilePrefix
+                         , fieldsExemptFromNormalization=[])
 
     def Reward(self, stateData):
         row = stateData.iloc[0]

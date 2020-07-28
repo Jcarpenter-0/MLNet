@@ -8,7 +8,7 @@ sys.path.insert(0, DirOffset)
 import experiments.experiments_common
 
 # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path>)
-Learners = [('http_server_caching', '8080', '1', 'exp-03-http-cache-learner', './pattern-0.txt')
+Learners = [('http_server_caching', '8080', '1', 'exp-03-http-cache-learner', './cubic-pattern.csv')
             ]
 
 # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)

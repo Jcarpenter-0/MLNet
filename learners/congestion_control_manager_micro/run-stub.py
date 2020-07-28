@@ -1,3 +1,4 @@
+import pandas as pd
 # Setup the dir
 DirOffset = '../../'
 
@@ -11,22 +12,21 @@ if __name__ == '__main__':
 
     port, address, mode, name, validationFilePath, traceFilePrefix = learners.learner_server.parseArgs()
 
-    validationPattern = None
+    validationPatternDF = None
 
     if name is None:
         raise Exception('Need learner name')
 
     if mode == 2 and validationFilePath is not None:
-        validationFileDS = open(validationFilePath, 'r')
+        validationPatternDF = pd.read_csv(validationFilePath)
 
-        validationPattern = validationFileDS.readlines()
     elif mode == 2 and validationFilePath is None:
         raise Exception('Need validation file path for validation mode')
 
 
     # EDIT - Define the learner===========================================
     from learners.congestion_control_manager_micro.cc_learner import CCLearner
-    learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPattern, traceFilePrefix=traceFilePrefix)
+    learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPatternDF, traceFilePrefix=traceFilePrefix)
     # ====================================================================
 
     learners.learner_server.DefineLearner(learner)

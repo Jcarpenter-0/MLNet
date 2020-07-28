@@ -25,26 +25,26 @@ PostTestTimeBufferSecods = 10
 ArbitraryTimeAddSeconds = 7
 
 # Train, Validate, then Test
-LearnerModes = ['1', '0', '1', '0']
+LearnerModes = ['1', '0']
 # Number of times to run validation
 ValidationCount = 1
 ValidationPatterns = [
-    './pattern-0.txt',
-    './pattern-1.txt',
-    './pattern-2.txt',
-    './pattern-3.txt'
+    './cubic-pattern.csv',
+    './bbr-pattern.csv',
+    './vegas-pattern.csv',
+    './reno-pattern.csv'
 ]
 
 Topologies = []
 
 # Generate Topology args
-for delay in range(10, 10, 10):
+for delay in range(10, 20, 10):
     delayCommand = ['mm-delay', '{}'.format(delay)]
     Topologies.append(delayCommand)
 
 for linkDirection in ['uplink', 'downlink']:
 
-    for lossRate in np.arange(0.05, 0.8, 0.05):
+    for lossRate in np.arange(0.1, 0.2, 0.1):
         lossCommand = ['mm-loss', linkDirection, '{}'.format(lossRate)]
         Topologies.append(lossCommand)
 
@@ -81,9 +81,10 @@ try:
                 ]
 
             # Define Applications as tuple (<host address>, <[args to the application]>)
-            Applications = [('http://100.64.0.2:8081', ['python3',
-                                                        DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py',
-                                                        '{}'.format(IperfRuns), 'http://100.64.0.1:8080', '-c|100.64.0.1 -t|{}'.format(IperfRunLengthSeconds)])
+            Applications = [('http://100.64.0.2:8081', [
+                'python3'
+                , DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'
+                ,'-c', '100.64.0.1', '-t', '{}'.format(IperfRunLengthSeconds), '{}'.format(IperfRuns), 'http://100.64.0.1:8080'])
                 , ('http://localhost:8081', ['iperf3', '-s'])
                             ]
 
@@ -104,9 +105,11 @@ try:
                                 ]
 
                 # Define Applications as tuple (<host address>, <[args to the application]>)
-                Applications = [('http://100.64.0.2:8081', ['python3',
-                                                            DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py',
-                                                            '{}'.format(IperfRuns), 'http://100.64.0.1:8080', '-c|100.64.0.1 -t|{}'.format(IperfRunLengthSeconds)])
+                Applications = [('http://100.64.0.2:8081', [
+                    'python3'
+                    , DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'
+                    , '-c', '100.64.0.1', '-t', '{}'.format(IperfRunLengthSeconds), '{}'.format(IperfRuns),
+                    'http://100.64.0.1:8080'])
                     , ('http://localhost:8081', ['iperf3', '-s'])
                                 ]
 

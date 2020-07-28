@@ -1,7 +1,4 @@
-import sys
 import subprocess
-import json
-import requests
 
 # Setup the dir
 DirOffset = '../../'
@@ -15,7 +12,7 @@ import applications.application_common
 
 
 def RunPing(pingArgsList):
-    """Run Ping command and return results in Json format"""
+    """Run Ping command and return results in python Dict"""
 
     command = ['ping']
     command.extend(pingArgsList)
@@ -39,29 +36,27 @@ def RunPing(pingArgsList):
 
     returnDict['targetURL'] = inputLine[1]
     returnDict['targetIP'] = inputLine[2]
-    returnDict['packetBytes'] = inputLine[3].split('(')[0]
-    returnDict['packetBytesActual'] = inputLine[3].split('(')[1].replace(')','')
+    returnDict['packetBytes'] = int(inputLine[3].split('(')[0])
+    returnDict['packetBytesActual'] = int(inputLine[3].split('(')[1].replace(')',''))
 
     packetLine = pingOutputLines[3].split(' ')
-    returnDict['packetsTransmitted'] = packetLine[0]
-    returnDict['packetsReceived'] = packetLine[3]
-    returnDict['packetLoss'] = packetLine[5].replace('%','')
-    returnDict['time'] = packetLine[-1]
+    returnDict['packetsTransmitted'] = int(packetLine[0])
+    returnDict['packetsReceived'] = int(packetLine[3])
+    returnDict['packetLoss'] = float(packetLine[5].replace('%', ''))
+    returnDict['time'] = int(packetLine[-1].replace('ms', ''))
 
     statLine = pingOutputLines[4].split(' ')[3].split('/')
 
-    returnDict['rttMin'] = statLine[0]
-    returnDict['rttAvg'] = statLine[1]
-    returnDict['rttMax'] = statLine[2]
-    returnDict['rttMdev'] = statLine[3]
+    returnDict['rttMin'] = float(statLine[0])
+    returnDict['rttAvg'] = float(statLine[1])
+    returnDict['rttMax'] = float(statLine[2])
+    returnDict['rttMdev'] = float(statLine[3])
 
     return returnDict
 
 
-# Allow call to just run iperf with initial args
-if __name__ == '__main__':
-
-    # Parse the args
+def ParsePingSysArgs():
+    """Take in the sys args (command args) and parse them into a python dict"""
     pingArgs = sys.argv[1:-2]
 
     # create a pingArgs dictionary so the values can be accessed and edited
@@ -72,11 +67,41 @@ if __name__ == '__main__':
     for pingArg in pingArgs:
         if '-' in pingArg and lastArg is None:
             pingArgsDict[pingArg] = None
+            lastArg = pingArg
         elif '-' not in pingArg and lastArg is not None:
-            pingArgsDict[lastArg] = pingArg
+
+            try:
+                pingArgsDict[lastArg] = int(pingArg)
+            except:
+                pass
+                pingArgsDict[lastArg] = pingArg
+
             lastArg = None
         elif '-' not in pingArg and lastArg is None:
             pingArgsDict['destination'] = pingArg
+
+    return pingArgsDict
+
+
+def ConvertArgsDictToArgsList(appArgsDict):
+    """Convert an python dict of application args into a list for subprocess execution"""
+    # rebuild the ping args list using new paras
+    args = []
+
+    for arg in appArgsDict.keys():
+
+        if arg != 'destination':
+            args.append(arg)
+
+        if appArgsDict[arg] is not None:
+            args.append('{}'.format(appArgsDict[arg]))
+
+    return args
+
+# Allow call to just run iperf with initial args
+if __name__ == '__main__':
+
+    pingArgsDict = ParsePingSysArgs()
 
     # Parse the learner target
     try:
@@ -89,24 +114,19 @@ if __name__ == '__main__':
     # run n times, allows the controller to "explore" the environment
     for runNum in range(0, runCount):
 
-        result = RunPing(pingArgs)
+        print(pingArgsDict)
+
+        commandArgs = ConvertArgsDictToArgsList(pingArgsDict)
+
+        result = RunPing(commandArgs)
 
         # add the command inputs to the result
         result.update(pingArgsDict)
 
         # Send to the learner
         if learnerTarget is not None:
-            response = applications.application_common.SendToLearnerL(result, learnerTarget)
+            response = applications.application_common.SendToLearner(result, learnerTarget, verbose=True)
 
             # Update args
             for key in response.keys():
                 pingArgsDict[key] = response[key]
-
-            # rebuild the ping args list using new paras
-            pingArgs = []
-
-            for arg in pingArgsDict.keys():
-                pingArgs.append(arg)
-
-                if pingArgsDict[arg] is not None:
-                    pingArgs.append(pingArgsDict[arg])

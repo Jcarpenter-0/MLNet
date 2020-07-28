@@ -10,7 +10,7 @@ sys.path.insert(0, DirOffset)
 import experiments.experiments_common
 
 # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path>)
-Learners = [('example_ping_manager',  '8080', '', '1', 'exp-02-ping-learner', '', '')
+Learners = [('example_ping_manager',  '8080', '', '2', 'exp-02-ping-learner', '', './pattern-0.csv')
             ]
 
 # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)

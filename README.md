@@ -24,3 +24,7 @@ A basic framework is provided that provides a space to setup experimental parame
 * Create a new folder in learners/ and add two python files (a copy of run-stub.py modified to import the proper RL you wish to use and a file that inhereits the RL core from learner_common.py)
 * In the new copy of inheritence file, define a reward from the state you expect (as a python dict, you select the textual field labels you wish to use)
 * Modify the construction of the RL class to fit particular hyper parameters you desire (layers, epochs, etc)
+
+# Tips for doing Machine Learning
+* Use only numeric data, text will not translate properly, use a mapping to either numeric values or binary columns to address
+* Consider using data that is "relevant" to achieving an end, this is a heuristic

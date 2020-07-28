@@ -1,45 +1,73 @@
 import keras
 import learners.learner_common
 import os
-from sklearn import preprocessing
-# Learner that will rotate congestion control algs based on metrics
-# Useful Notes:
-# sysctl net.ipv4.tcp_available_congestion_control - displays cc's available on host
 
-class CCLearner(learners.learner_common.KerasDelta):
+class CCLearner(learners.learner_common.KerasBlackBox):
 
     def __init__(self, learnerName, learnerMode, validationPattern, traceFilePrefix):
-        super(CCLearner, self).__init__(startVectorFieldNames=['bps-0', 'retransmits-0'
-            , 'actionID-0'
-            , 'actionID-1'
-            , 'actionID-2'
-            , 'actionID-3']
-                                        , endVectorFieldNames=['bps-1', 'retransmits-1']
+        super(CCLearner, self).__init__(inputFieldNames=[
+            'bps-0'
+            , 'retransmits-0'
+            , 'cubic'
+            , 'bbr'
+            , 'vegas'
+            , 'reno'
+            , 'bps-1'
+            , 'retransmits-1']
+            , actionFields={
+                'cubic': range(0, 1),
+                'bbr': range(0, 1),
+                'vegas': range(0, 1),
+                'reno': range(0, 1)
+            }
+            , targetFields=[
+                'bps-1'
+                ,'retransmits-1'
+            ]
                                         , learnerName=learnerName
                                         , learnerMode=learnerMode
                                         , validationPattern=validationPattern
-                                        , numberOfActions=4
                                         , epsilon=65
                                         , epochs=30
                                         , normalizationApproach='l2'
                                         , normalizationAxis=1
                                         , traceFilePrefix=traceFilePrefix
-                                        , fieldsExemptFromNormalization=['actionID-0'
-                                                                        , 'actionID-1'
-                                                                        , 'actionID-2'
-                                                                        , 'actionID-3'
+                                        , fieldsExemptFromNormalization=['cubic'
+                                                                        , 'bbr'
+                                                                        , 'vegas'
+                                                                        , 'reno'
                                                                          ]
                                         )
 
         self.Description = 'Rotate Congestion Control Algorithm based on metrics'
-        self.InputFieldDescriptions = '{\'bps\':<float>, \'retransmits\':<int>, \'actionID\':<int>} Bits per second (bps) of the iperf run, retransmission count, and the action id corresponding to the CC used.'
-        self.OutputFieldDescriptions = 'Returned CC to use: 0=cubic, 1=bbr, 2=vegas, 3=reno'
+        self.InputFieldDescriptions = '{\'bps\':<float>, \'retransmits\':<int>, \'actionID\':<int>}'
+        self.OutputFieldDescriptions = 'Returned CC to use'
 
     def Reward(self, stateData):
         row = stateData.iloc[0]
 
         reward = float(row["bps-1"]) * 2 - float(row["retransmits-1"]) * 1
         return reward
+
+    def DefineActionSpace(self):
+
+        possibleActions = []
+
+        # the actions are binary, only exclusive or allowed
+        exclusiveBinaryORGroup = ['cubic', 'bbr', 'reno', 'vegas']
+
+        for activeIndex, activeBinaryChoice in enumerate(exclusiveBinaryORGroup):
+            actionPattern = dict()
+
+            actionPattern[activeBinaryChoice] = 1
+
+            for otherIndex, otherBinaryChoice in enumerate(exclusiveBinaryORGroup):
+                if activeIndex != otherIndex:
+                    actionPattern[otherBinaryChoice] = 0
+
+            possibleActions.append(actionPattern)
+
+        return possibleActions
 
     def BaseModelGeneration(self, modelName, inputCount):
 
@@ -60,9 +88,6 @@ class CCLearner(learners.learner_common.KerasDelta):
         # Check for existing model to load in
         if os.path.exists(self.ModelFolderRoot + modelName):
             model.load_weights(self.ModelFolderRoot + modelName)
-
-        # set the learning rate
-        optimizer = keras.optimizers.Adam()
 
         # Finally put model together for training
         model.compile(optimizer='SGD', loss='mean_squared_error', metrics=['acc'])

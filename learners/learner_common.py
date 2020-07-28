@@ -3,27 +3,27 @@ import json
 import pandas as pd
 import datetime
 import random
-import copy
 from sklearn import preprocessing
 
-'''Base Class'''
-class ReinforcementLearner(object):
 
-    """Learner Definition
-    learnerMode = Mode to set the learner in, 0=testing, 1=training, 2=validating"""
+class ReinforcementLearner(object):
+    """
+    learnerMode = Mode to set the learner in, 0=testing, 1=training, 2=validating \n
+    actionFields = dict {fieldName: rangeOfNumericInputs} \n
+    validationPattern = Pandas Dataframe of action inputs \n
+    """
     def __init__(self
                  , learnerName
                  , learnerMode
                  , validationPattern
-                 , numberOfActions
                  , epsilon
                  , inputFieldNames
+                 , actionFields
+                 , traceFilePrefix
                  , normalizationApproach
                  , normalizationAxis
-                 , traceFilePrefix
                  , fieldsExemptFromNormalization=[]
                  ):
-
         self.LearnerName = learnerName
 
         # Fields to describe the Learner's high level details
@@ -35,10 +35,10 @@ class ReinforcementLearner(object):
         # Some Learner Metadata
         self.RunDuration = 0
         self.Training = learnerMode == 1
+        self.ActionFields = actionFields
         self.ValidationPattern = validationPattern
         self.LearnerMode = learnerMode
         self.Verbose = False
-        self.NumberOfActions = numberOfActions
 
         self.Epsilon = epsilon
         self.NormalizationApproach = normalizationApproach
@@ -49,8 +49,6 @@ class ReinforcementLearner(object):
         self.LearnerStartSession = datetime.datetime.now()
 
         # Some field Constants
-        self.ActionFieldText = 'actionID-{}'
-        self.ReturnBodyText = 'actionID'
         self.DateFormat = "%d-%m-%Y-%H-%M-%S"
         self.CoreFolderRoot = './tmp/' + learnerName + '/'
         self.ModelFolderRoot = self.CoreFolderRoot + 'models/'
@@ -58,7 +56,7 @@ class ReinforcementLearner(object):
         self.ReportFileName = self.CoreFolderRoot + learnerName + '-report.json'
 
         self.CurrentTraceFileHeaders = ['Timestamp', 'Reward']
-        self.CurrentDecisionTraceFileHeaders = ['Timestamp', 'Step', 'ActionID', 'Predicted-State', 'Reward', 'Input-State']
+        self.CurrentDecisionTraceFileHeaders = ['Timestamp', 'Step', 'Input-State', 'Predicted-State', 'Reward']
 
         # Add the state fields
         self.CurrentTraceFileHeaders.extend(inputFieldNames)
@@ -146,23 +144,90 @@ class ReinforcementLearner(object):
         descriptionDict = {'Description': self.Description,
                            'Mode': self.LearnerMode,
                            'InputFieldDescriptions': self.InputFieldDescriptions,
+                           'ActionFields': self.ActionFields,
                            'OutputFieldDescriptions': self.OutputFieldDescriptions}
 
         return descriptionDict
 
     def ModifyState(self, state):
-        """Modify the state, if at all before normalization and training/acting. State is panda dataframe and expects to return one."""
+        """Modify the state, if at all before normalization and training/acting.
+        State is python dict and expects to return one."""
         return state
 
-    '''Take in stateData (as a Python Dict), return a command structure (as a Python Dict)'''
+    def ModifyNextActions(self, nextActions):
+        """Modify the next action dict, and return it"""
+        return nextActions
+
+    def DefineActionSpace(self):
+        """OVERRIDABLE, Map all the possible action states (returned as a list of dicts where each dict is the possible action row).
+        \n default case is assume all action fields independent and thus multiplicative"""
+        # List to hold what action para is to be used, will be n entries where n is number of action paras
+        actionIndices = []
+
+        for actionFieldNum in range(0, len(self.ActionFields)):
+            actionIndices.append(0)
+
+        # Get number of possible actions
+        numberOfPossibleActions = 1
+
+        for inputField in self.ActionFields.keys():
+            inputFieldValues = self.ActionFields[inputField]
+
+            numberOfPossibleActions = numberOfPossibleActions * len(inputFieldValues)
+
+        # action para patterns
+        inputPatterns = []
+
+        # for all possible patterns of input paras
+        for currentActionParaPatternIndex in range(0, numberOfPossibleActions):
+
+            inputPatternDict = dict()
+
+            # for every action and value of actions
+            for index, actionField in enumerate(self.ActionFields.keys()):
+                actionFieldInputRange = self.ActionFields[actionField]
+
+                inputPlace = actionIndices[index]
+
+                # check for wraparound
+                if inputPlace != 0 and inputPlace % len(actionFieldInputRange) == 0:
+                    actionIndices[index] = 0
+                    inputPlace = 0
+
+                    # increase the previous input's place as well
+                    if index != 0:
+                        actionIndices[index - 1] += 1
+
+                inputPatternDict[actionField] = actionFieldInputRange[inputPlace]
+
+                # increment the action indices
+                actionIndices[index] += 1
+
+            inputPatterns.append(inputPatternDict)
+
+        return inputPatterns
+
+    def Explore(self):
+        """Take a curious move, to find out/probe the environment space.
+        \n Default case simply picks 1 out of all possible actions defined by action space"""
+        # pick a random action vector
+        possibleActions = self.DefineActionSpace()
+
+        return possibleActions[random.randint(0, len(possibleActions) - 1)]
+
     def Operate(self, stateData):
+        """Take in raw state as python dict,
+         process through RL components, then return python dict of action parameters"""
 
         # Dictionary for logging
         logDict = stateData.copy()
 
+        # Optionally apply logic to modify incoming data
+        stateData = self.ModifyState(stateData)
+
         # prep for conversion
         for key in stateData.keys():
-            # box into lists each entry
+            # box into lists each entry, for setting up dataframe
             stateData[key] = [stateData[key]]
 
         # Convert to data frame for training
@@ -170,35 +235,30 @@ class ReinforcementLearner(object):
 
         # only keep the fields defined for the learner for training/testing
         state = state[self.InputFieldNames]
-        rawState = pd.DataFrame.copy(state)
-
-        state = self.ModifyState(state)
-
-        if self.Verbose:
-            print('State DF {}'.format(state.shape))
-            print(state.head())
 
         # Do potential normalization, for training
+        normalizedState = state.copy()
+
         if self.NormalizationApproach is not None:
             # extract fields needed for normalization
-            normalizeDF = state.copy()
+            normalizeDF = normalizedState.copy()
             normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
 
             normalizeDF = pd.DataFrame(columns=normalizeDF.columns
-                                , data=preprocessing.normalize(normalizeDF.values
-                                , norm=self.NormalizationApproach
-                                , axis=self.NormalizationAxis))
+                                       , data=preprocessing.normalize(normalizeDF.values
+                                                                      , norm=self.NormalizationApproach
+                                                                      , axis=self.NormalizationAxis))
 
             # return normalized fields to regular state
             for column in normalizeDF.columns:
-                state[column] = normalizeDF[column]
+                normalizedState[column] = normalizeDF[column]
 
             if self.Verbose:
                 print('State-Normalized')
-                print(state.head())
+                print(normalizedState.head())
 
         # calculate reward
-        logDict['Reward'] = self.Reward(state)
+        logDict['Reward'] = self.Reward(normalizedState)
         logDict['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
         logDict['Step'] = self.RunDuration
 
@@ -209,41 +269,47 @@ class ReinforcementLearner(object):
             logLine += '{},'.format(logDict[key])
 
         self.CurrentTraceFileDS.write('{}\n'.format(logLine))
-
         self.CurrentTraceFileDS.flush()
 
-        # do potential training
-        explore = False
-
-        if self.Training:
-            explore = self.Train(state)
+        nextActions = dict()
 
         if self.LearnerMode == 2:
-            nextAction = self.ValidationPattern[self.RunDuration % len(self.ValidationPattern)]
+            patternRow = self.ValidationPattern.iloc[[self.RunDuration % len(self.ValidationPattern)]]
 
-        # If not validating, testing or training
+            for col in patternRow.columns:
+                # unbox pandas data value to fit dict
+                nextActions[col] = int(patternRow[col].values[0])
+
+        # If not validating, then testing or training
         if self.LearnerMode != 2:
+
+            # do potential training
+            explore = False
+
+            if self.Training:
+                explore = self.Train(normalizedState)
 
             # Explore or Exploit for next action
             if explore:
-                # pick a random action
-                nextAction = random.randint(0, self.NumberOfActions-1)
+                nextActions = self.Explore()
             else:
-                nextAction = self.Act(state, rawState)
+                nextActions = self.Act(state)
 
         self.RunDuration += 1
 
-        return {self.ReturnBodyText: nextAction}
+        # Optionally apply modification to the returned actions
+        nextActions = self.ModifyNextActions(nextActions)
 
-    """Fit model with data from the state (as a pandas dataframe)"""
+        return nextActions
+
     def Train(self, state):
+        """Fit model with data from the state (as a pandas dataframe)"""
         return NotImplementedError
 
-    """Apply the model to data from state (as a pandas dataframe) to make the next action"""
-    def Act(self, state, rawState=None):
+    def Act(self, state):
+        """Apply the model to data from state (as a pandas dataframe) to make the next action"""
         return NotImplementedError
 
-    '''Write out logs for training sessions and the model's criteria'''
     def Conclude(self):
 
         # conclusion time
@@ -267,20 +333,30 @@ class ReinforcementLearner(object):
         # load in the run logs for this current run and then get the values of a reward
         runLogDF = pd.read_csv(self.CurrentTraceFileName)
 
+        for index, actionFieldKey in enumerate(self.ActionFields.keys()):
+
+            if index == 0:
+                runLogDF['ActionParasAsID'] = runLogDF[actionFieldKey].map(str)
+            else:
+                runLogDF['ActionParasAsID'] += runLogDF[actionFieldKey].map(str)
+
+            if index < len(self.ActionFields.keys()):
+                runLogDF['ActionParasAsID'] += '-'
+
         # Get the reward performance of each action
         actionInfoList = dict()
 
-        for index in range(0, self.NumberOfActions):
-            actionField = self.ActionFieldText.format(index)
-            actionDF = runLogDF[runLogDF[actionField] == 1]
+        uniqueActions = runLogDF['ActionParasAsID'].unique()
+
+        for action in uniqueActions:
+            actionDF = runLogDF[runLogDF['ActionParasAsID'] == action]
             rewardDF = actionDF['Reward']
 
             std = rewardDF.std()
             avg = rewardDF.mean()
             count = rewardDF.count()
 
-            actionInfoList[int(index)] = {'mean': avg, 'std': std, 'count': int(count)}
-
+            actionInfoList[action] = {'mean': avg, 'std': std, 'count': int(count)}
 
         newFields = {'time-started': self.LearnerStartSession.strftime(self.DateFormat),
                      'time-ended': self.LearnerStopSession.strftime(self.DateFormat),
@@ -312,189 +388,49 @@ class ReinforcementLearner(object):
 
             configData['validation-sessions'] = listOfValidationEntries
 
-
         mlconfigFileDS = open(self.ReportFileName, 'w')
 
         mlconfigFileDS.write(json.dumps(configData, indent=5))
-
         mlconfigFileDS.flush()
         mlconfigFileDS.close()
-        print('Model Output Report Written')
 
-    # Return a numeric reward value based on metrics
     def Reward(self, stateData):
+        """Calculate reward from stateData (pandas dataframe), returned as a numeric value"""
         return NotImplementedError
-
-'''Keras implementation of a multi-model future state predictive algorithm'''
-'''Takes in a starter vector plus finish vector with action transition'''
 
 '''Useful links'''
 '''https://towardsdatascience.com/building-a-deep-learning-model-using-keras-1548ca149d37'''
 '''https://stats.stackexchange.com/questions/284189/simple-linear-regression-in-keras'''
-''''''
-class KerasDelta(ReinforcementLearner):
-
-    """Start Vector is the initial values or a first run state
-    End Vector is the values of a second run to contrast with first run, plus the action that got there
-    """
-    def __init__(self
-                 , startVectorFieldNames
-                 , endVectorFieldNames
-                 , learnerName
-                 , learnerMode
-                 , numberOfActions
-                 , epsilon
-                 , epochs
-                 , normalizationApproach
-                 , normalizationAxis
-                 , traceFilePrefix
-                 , fieldsExemptFromNormalization=[]
-                 , validationPattern = None
-                 ):
-        inputFieldNames = copy.deepcopy(startVectorFieldNames)
-        inputFieldNames.extend(endVectorFieldNames)
-        super().__init__(
-                        learnerName=learnerName
-                         , learnerMode=learnerMode
-                         , validationPattern=validationPattern
-                         , numberOfActions=numberOfActions
-                         , epsilon=epsilon
-                         , inputFieldNames=inputFieldNames
-                        , normalizationAxis=normalizationAxis
-                        , normalizationApproach=normalizationApproach
-                        , traceFilePrefix=traceFilePrefix
-                        , fieldsExemptFromNormalization=fieldsExemptFromNormalization
-        )
-
-        self.Epochs = epochs
-        self.StartVectorFieldNames = startVectorFieldNames
-        self.EndVectorFieldNames = endVectorFieldNames
-
-        # Models
-        self.ModelReferences = dict()
-
-        # Feed in list of strings, the names of all the fields expected
-        # The model names will be the patterns of fields and actions
-        inputCount = len(startVectorFieldNames)
-
-        # Generate modelnames
-        # Model naming scheme, 'predictedvariable'
-        # Example: 'retransmits'
-        for endVector in endVectorFieldNames:
-
-            # Take a field, and then create a sequence of the other fields
-            self.ModelReferences[endVector] = self.BaseModelGeneration(endVector, inputCount)
-
-    '''Return new instance of a keras model, fully compiled'''
-    def BaseModelGeneration(self, modelName, inputCount):
-        return NotImplementedError
-
-    '''Hand the state off to each of the models'''
-    def Train(self, state):
-
-        for modelname in self.ModelReferences.keys():
-
-            model = self.ModelReferences[modelname]
-
-            # Get target values
-            train_y = state[modelname]
-
-            # Make dataframe of state, without the targeted field
-            train_x = state.copy()
-            train_x = train_x.drop(columns=self.EndVectorFieldNames)
-
-            # Fit action to reward, so that given an action we can see the potential impact
-            trainingResult = model.fit(train_x, train_y
-                                       , epochs=self.Epochs
-                                       , verbose=self.Verbose)
-
-            # Save model out
-            model.save(self.ModelFolderRoot + modelname)
-
-        # Return explore/exploit
-        return random.randint(1, 100) <= self.Epsilon
-
-    def Reward(self, stateData):
-        return NotImplementedError
-
-    '''Predict the next state based on potential actions and then pick highest rewarding entry'''
-    def Act(self, state):
-
-        highestRewardingAction = -1
-        highestReward = -1
-
-        # For each action, try to predict it's impact on the new state
-        for actionID in range(0, self.NumberOfActions):
-
-            newState = pd.DataFrame()
-
-            for modelname in self.ModelReferences.keys():
-
-                model = self.ModelReferences[modelname]
-
-                # Make dataframe of state, without the targeted field
-                test_x = state.copy()
-                test_x = test_x.drop(columns=self.EndVectorFieldNames)
-                # Set action id
-                # blank the other actions
-
-                for subActID in range(0, self.NumberOfActions):
-                    test_x[self.ActionFieldText.format(subActID)] = [0]
-
-                test_x[self.ActionFieldText.format(actionID)] = [1]
-
-                predictedValue = model.predict(test_x)[0][0]
-
-                newState[modelname] = [predictedValue]
-
-
-            # Analyze the predicted new state, do reward calculation
-            newStateString = ''
-
-            for key in newState.columns:
-                newStateString += '{}:{}|'.format(key, newState.iloc[0][key])
-
-            calcReward = self.Reward(newState)
-
-            if calcReward > highestReward:
-                highestReward = calcReward
-                highestRewardingAction = actionID
-
-            if self.Verbose:
-                print('Predicted new Action {} State {} Reward:{}'.format(actionID, newStateString, calcReward))
-
-            logLine = '{},{},{},{},{},{}\n'.format(datetime.datetime.now().strftime(self.DateFormat)
-                                                   , self.RunDuration
-                                                   , actionID
-                                                   , newStateString
-                                                   , calcReward
-                                                   , state.to_dict())
-
-            self.CurrentDecisionTraceFileDS.write(logLine)
-
-            self.CurrentDecisionTraceFileDS.flush()
-
-        # End action For
-        return highestRewardingAction
-
 class KerasBlackBox(ReinforcementLearner):
-    """Take in inputs, define action space, learn target fields"""
-    """Action Fields are defined as dict(nameofField, rangeOfpossiblevalues)"""
+    """Take in inputs, define action space, learn target fields.
+    Action Fields are defined as dict(nameofField, rangeOfpossiblevalues)"""
     def __init__(self
                  , learnerName
                  , learnerMode
                  , validationPattern
                  , epsilon
                  , inputFieldNames
-                 , acitonFields
+                 , actionFields
                  , targetFields
                  , epochs
-                 ,normalizationApproach, normalizationAxis, traceFilePrefix):
-        super().__init__(learnerName, learnerMode, validationPattern, 0, epsilon, inputFieldNames,
-                         normalizationApproach, normalizationAxis, traceFilePrefix)
+                 , fieldsExemptFromNormalization
+                 , normalizationApproach
+                 , normalizationAxis
+                 , traceFilePrefix):
+        super().__init__(
+            learnerName=learnerName
+            , learnerMode=learnerMode
+            , validationPattern=validationPattern
+            , epsilon=epsilon
+            , inputFieldNames=inputFieldNames
+            , actionFields=actionFields
+            , normalizationApproach=normalizationApproach
+            , normalizationAxis=normalizationAxis
+            , traceFilePrefix=traceFilePrefix
+            , fieldsExemptFromNormalization=fieldsExemptFromNormalization
+        )
 
         self.Epochs = epochs
-        self.ActionFields = acitonFields
         self.TargetFields = targetFields
 
         # Models
@@ -512,11 +448,23 @@ class KerasBlackBox(ReinforcementLearner):
             self.ModelReferences[endVector] = self.BaseModelGeneration(endVector, inputCount)
 
     def BaseModelGeneration(self, modelName, inputCount):
-        '''Return new instance of a keras model, fully compiled'''
+        """ Define the common model for predicting"""
         return NotImplementedError
 
+    def Explore(self):
+        return super(KerasBlackBox, self).Explore()
+
+    def ModifyState(self, state):
+        return super(KerasBlackBox, self).ModifyState(state)
+
+    def ModifyNextActions(self, nextActions):
+        return super(KerasBlackBox, self).ModifyNextActions(nextActions)
+
+    def DefineActionSpace(self):
+        return super(KerasBlackBox, self).DefineActionSpace()
+
     def Train(self, state):
-        '''Hand the state off to each of the models'''
+        "Take the state, and the targeted values and fit them"
         for modelname in self.ModelReferences.keys():
             model = self.ModelReferences[modelname]
 
@@ -535,84 +483,40 @@ class KerasBlackBox(ReinforcementLearner):
             # Save model out
             model.save(self.ModelFolderRoot + modelname)
 
+            if self.Verbose:
+                print('Training with {} to make {}'.format(train_x, train_y))
+
         # Return explore/exploit
         return random.randint(1, 100) <= self.Epsilon
 
     def Reward(self, stateData):
         return NotImplementedError
 
-    def Act(self, state, rawState):
-        """Receive the state (dataframe) and stateData (raw state dataframe) and then act. You only need the raw dataframe if normalizing on the state."""
-
-        # List to hold what action para is to be used, will be n entries where n is number of action paras
-        actionIndices = []
-
-        for actionFieldNum in range(0, len(self.ActionFields)):
-            actionIndices.append(0)
-
-        # Get number of possible actions
-        numberOfPossibleActions = 1
-
-        for inputField in self.ActionFields.keys():
-            inputFieldValues = self.ActionFields[inputField]
-
-            numberOfPossibleActions = numberOfPossibleActions * len(inputFieldValues)
+    def Act(self, state):
+        """Receive the state (dataframe) and stateData (raw state dataframe) and then act.
+        You only need the raw dataframe if normalizing on the state."""
 
         # action para patterns
-        inputPatterns = []
-
-        # for all possible patterns of input paras
-        for currentActionParaPatternIndex in range(0, numberOfPossibleActions):
-
-            inputPatternDataFrame = pd.DataFrame()
-
-            # for every action and value of actions
-            for index, actionField in enumerate(self.ActionFields.keys()):
-                actionFieldInputRange = self.ActionFields[actionField]
-
-                inputPlace = actionIndices[index]
-
-                # check for wraparound
-                if inputPlace != 0 and inputPlace % len(actionFieldInputRange) == 0:
-                    actionIndices[index] = 0
-                    inputPlace = 0
-
-                    # increase the previous input's place as well
-                    if index != 0:
-                        actionIndices[index-1] += 1
-
-                inputPatternDataFrame[actionField] = actionFieldInputRange[inputPlace]
-
-                # increment the action indices
-                actionIndices[index] += 1
-
-            inputPatterns.append(inputPatternDataFrame)
-
+        inputPatterns = self.DefineActionSpace()
 
         # Go through all the possible input patterns and see what one gives highest reward
         highestRewardValue = -1
         highestRewardIndex = -1
 
-        for inputIndex, inputPatternDataFrame in enumerate(inputPatterns):
+        for inputIndex, inputPatternDict in enumerate(inputPatterns):
 
             newState = pd.DataFrame()
 
             for modelname in self.ModelReferences.keys():
                 model = self.ModelReferences[modelname]
 
-                # Make dataframe of state, without the targeted field
-                if self.NormalizationApproach is not None:
-                    # copy the raw unormalized state so it can be normalized with actions
-                    test_x = rawState.copy()
-                else:
-                    # Copy the non-normalized state, as we are not normalizing it
-                    test_x = state.copy()
-
+                test_x = state.copy()
                 test_x = test_x.drop(columns=self.TargetFields)
 
                 # append the inputPattern
-                for col in inputPatternDataFrame.columns:
-                    test_x[col] = inputPatternDataFrame[col]
+                for col in inputPatternDict.keys():
+                    # box the dict values so that they fit into the pandas dataframe
+                    test_x[col] = [inputPatternDict[col]]
 
                 # if normalizing, append the columns, then drop exempt ones, normalize, re-add exempts
                 if self.NormalizationApproach is not None:
@@ -631,6 +535,7 @@ class KerasBlackBox(ReinforcementLearner):
 
                 predictedValue = model.predict(test_x)[0][0]
 
+                # box the predicted value so that it fits into pandas dataframe
                 newState[modelname] = [predictedValue]
 
             # calculate the reward
@@ -641,13 +546,36 @@ class KerasBlackBox(ReinforcementLearner):
                 highestRewardValue = rewardCalculatedFromPrediction
 
             # log the predicted state for the input state
+            logDict = dict()
+
+            logDict['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
+            logDict['Step'] = self.RunDuration
+            logDict['Input-State'] = '\"{}\"'.format(inputPatternDict)
+            logDict['Predicted-State'] = '\"{}\"'.format(newState.to_dict())
+            logDict['Reward'] = rewardCalculatedFromPrediction
+
+            decLogString = ''
+            for index, decLogField in enumerate(self.CurrentDecisionTraceFileHeaders):
+                decLogString += '{}'.format(logDict[decLogField])
+
+                if index < len(self.CurrentDecisionTraceFileHeaders):
+                    decLogString += ','
+
+            if self.Verbose:
+                print("{}".format(decLogString))
+
+            if self.CurrentDecisionTraceFileName is not None:
+                self.CurrentDecisionTraceFileDS.write('{}\n'.format(decLogString))
+                self.CurrentDecisionTraceFileDS.flush()
 
         returnDict = dict()
 
         highestRewardDF = inputPatterns[highestRewardIndex]
 
         for actionField in self.ActionFields.keys():
-            returnDict[actionField] = highestRewardDF[actionField].values[0]
+            returnDict[actionField] = int(highestRewardDF[actionField])
+
+        if self.Verbose:
+            print('Acting Return Actionset: {}'.format(str(returnDict)))
 
         return returnDict
-

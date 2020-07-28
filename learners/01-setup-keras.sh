@@ -2,6 +2,9 @@
 
 # Helpful link: https://tech.amikelive.com/node-887/how-to-resolve-error-illegal-instruction-core-dumped-when-running-import-tensorflow-in-a-python-program/
 
+#sudo apt-get update
+#sudo apt-get -y install python3-pip
+
 # install old keras
 pip3 install keras
 # older version ==2.1.5
