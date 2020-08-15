@@ -15,14 +15,14 @@ class ReinforcementLearner(object):
     def __init__(self
                  , learnerName
                  , learnerMode
-                 , validationPattern
-                 , epsilon
                  , inputFieldNames
                  , actionFields
-                 , traceFilePrefix
-                 , normalizationApproach
-                 , normalizationAxis
-                 , fieldsExemptFromNormalization=[]
+                 , explorePercentage=65
+                 , validationPattern = None
+                 , traceFilePrefix = None
+                 , normalizationApproach = None
+                 , normalizationAxis = None
+                 , fieldsExemptFromNormalization=None
                  ):
         self.LearnerName = learnerName
 
@@ -40,7 +40,7 @@ class ReinforcementLearner(object):
         self.LearnerMode = learnerMode
         self.Verbose = False
 
-        self.Epsilon = epsilon
+        self.Epsilon = explorePercentage
         self.NormalizationApproach = normalizationApproach
         self.NormalizationAxis = normalizationAxis
         self.FieldsExemptFromNormalization = fieldsExemptFromNormalization
@@ -55,8 +55,8 @@ class ReinforcementLearner(object):
         self.TracesFolderRoot = self.CoreFolderRoot + 'traces/'
         self.ReportFileName = self.CoreFolderRoot + learnerName + '-report.json'
 
-        self.CurrentTraceFileHeaders = ['Timestamp', 'Reward']
-        self.CurrentDecisionTraceFileHeaders = ['Timestamp', 'Step', 'Input-State', 'Predicted-State', 'Reward']
+        self.CurrentTraceFileHeaders = ['Timestamp', 'Reward', 'Normalized-Reward', 'Normalized-State']
+        self.CurrentDecisionTraceFileHeaders = ['Timestamp', 'Step', 'Input-State', 'Predicted-State', 'Reward', 'Normalized-Reward']
 
         # Add the state fields
         self.CurrentTraceFileHeaders.extend(inputFieldNames)
@@ -144,7 +144,7 @@ class ReinforcementLearner(object):
         descriptionDict = {'Description': self.Description,
                            'Mode': self.LearnerMode,
                            'InputFieldDescriptions': self.InputFieldDescriptions,
-                           'ActionFields': self.ActionFields,
+                           #'ActionFields': self.ActionFields,
                            'OutputFieldDescriptions': self.OutputFieldDescriptions}
 
         return descriptionDict
@@ -242,7 +242,9 @@ class ReinforcementLearner(object):
         if self.NormalizationApproach is not None:
             # extract fields needed for normalization
             normalizeDF = normalizedState.copy()
-            normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
+
+            if self.FieldsExemptFromNormalization is not None:
+                normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
 
             normalizeDF = pd.DataFrame(columns=normalizeDF.columns
                                        , data=preprocessing.normalize(normalizeDF.values
@@ -258,7 +260,9 @@ class ReinforcementLearner(object):
                 print(normalizedState.head())
 
         # calculate reward
-        logDict['Reward'] = self.Reward(normalizedState)
+        logDict['Reward'] = self.Reward(state)
+        logDict['Normalized-Reward'] = self.Reward(normalizedState)
+        logDict['Normalized-State'] = '\"{}\"'.format(normalizedState.to_dict())
         logDict['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
         logDict['Step'] = self.RunDuration
 
@@ -350,13 +354,21 @@ class ReinforcementLearner(object):
 
         for action in uniqueActions:
             actionDF = runLogDF[runLogDF['ActionParasAsID'] == action]
+            normrewardDF = actionDF['Normalized-Reward']
             rewardDF = actionDF['Reward']
+
+            nrmStd = normrewardDF.std()
+            nrmavg = normrewardDF.mean()
+            nrmCount = normrewardDF.count()
+            nrmSum = normrewardDF.sum()
 
             std = rewardDF.std()
             avg = rewardDF.mean()
             count = rewardDF.count()
+            sum = rewardDF.sum()
 
-            actionInfoList[action] = {'mean': avg, 'std': std, 'count': int(count)}
+            actionInfoList[action] = {'mean': avg, 'std': std, 'count': int(count), 'sum': sum
+                                      ,'nrm-mean': nrmavg, 'nrm-std': nrmStd, 'nrm-count': int(nrmCount), 'nrm-sum': nrmSum}
 
         newFields = {'time-started': self.LearnerStartSession.strftime(self.DateFormat),
                      'time-ended': self.LearnerStopSession.strftime(self.DateFormat),
@@ -398,30 +410,28 @@ class ReinforcementLearner(object):
         """Calculate reward from stateData (pandas dataframe), returned as a numeric value"""
         return NotImplementedError
 
-'''Useful links'''
-'''https://towardsdatascience.com/building-a-deep-learning-model-using-keras-1548ca149d37'''
-'''https://stats.stackexchange.com/questions/284189/simple-linear-regression-in-keras'''
+
 class KerasBlackBox(ReinforcementLearner):
     """Take in inputs, define action space, learn target fields.
     Action Fields are defined as dict(nameofField, rangeOfpossiblevalues)"""
     def __init__(self
                  , learnerName
                  , learnerMode
-                 , validationPattern
-                 , epsilon
                  , inputFieldNames
                  , actionFields
-                 , targetFields
+                 , targetFieldNames
                  , epochs
-                 , fieldsExemptFromNormalization
-                 , normalizationApproach
-                 , normalizationAxis
-                 , traceFilePrefix):
+                 , validationPattern = None
+                 , explorePercentage = 65
+                 , fieldsExemptFromNormalization = None
+                 , normalizationApproach = None
+                 , normalizationAxis = None
+                 , traceFilePrefix = None):
         super().__init__(
             learnerName=learnerName
             , learnerMode=learnerMode
             , validationPattern=validationPattern
-            , epsilon=epsilon
+            , explorePercentage=explorePercentage
             , inputFieldNames=inputFieldNames
             , actionFields=actionFields
             , normalizationApproach=normalizationApproach
@@ -431,19 +441,19 @@ class KerasBlackBox(ReinforcementLearner):
         )
 
         self.Epochs = epochs
-        self.TargetFields = targetFields
+        self.TargetFields = targetFieldNames
 
         # Models
         self.ModelReferences = dict()
 
         # Feed in list of strings, the names of all the fields expected
         # The model names will be the patterns of fields and actions
-        inputCount = len(inputFieldNames) - len(targetFields)
+        inputCount = len(inputFieldNames) - len(targetFieldNames)
 
         # Generate modelnames
         # Model naming scheme, 'predictedvariable'
         # Example: 'retransmits'
-        for endVector in targetFields:
+        for endVector in targetFieldNames:
             # Take a field, and then create a sequence of the other fields
             self.ModelReferences[endVector] = self.BaseModelGeneration(endVector, inputCount)
 
@@ -522,7 +532,9 @@ class KerasBlackBox(ReinforcementLearner):
                 if self.NormalizationApproach is not None:
                     # extract fields needed for normalization
                     normalizeDF = test_x.copy()
-                    normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
+
+                    if self.FieldsExemptFromNormalization is not None:
+                        normalizeDF = normalizeDF.drop(columns=self.FieldsExemptFromNormalization)
 
                     normalizeDF = pd.DataFrame(columns=normalizeDF.columns
                                                , data=preprocessing.normalize(normalizeDF.values
@@ -534,6 +546,8 @@ class KerasBlackBox(ReinforcementLearner):
                         test_x[column] = normalizeDF[column]
 
                 predictedValue = model.predict(test_x)[0][0]
+
+                # Reverse the normalization of the predicted data
 
                 # box the predicted value so that it fits into pandas dataframe
                 newState[modelname] = [predictedValue]
@@ -552,6 +566,7 @@ class KerasBlackBox(ReinforcementLearner):
             logDict['Step'] = self.RunDuration
             logDict['Input-State'] = '\"{}\"'.format(inputPatternDict)
             logDict['Predicted-State'] = '\"{}\"'.format(newState.to_dict())
+            logDict['Normalized-Reward'] = rewardCalculatedFromPrediction
             logDict['Reward'] = rewardCalculatedFromPrediction
 
             decLogString = ''

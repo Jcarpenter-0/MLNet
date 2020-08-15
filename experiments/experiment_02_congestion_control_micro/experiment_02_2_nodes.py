@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 import experiments.experiments_common
+import learners.learner_common
 
 ExperimentLengthSeconds = 1800
 
@@ -64,7 +65,7 @@ try:
 
         NetworkArg = topo.copy()
 
-        NetworkArg.extend(['python3', DirOffset + 'applications/operation-server.py', '8081'])
+        NetworkArg.extend(['python3', DirOffset + 'applications/operation_server.py', '8081'])
 
         for topoPara in topo:
             logPrefix += '-{}'.format(topoPara)
@@ -77,7 +78,7 @@ try:
 
             # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
             NetworkNodes = [NetworkArg,
-                            ['python3', DirOffset + 'applications/operation-server.py', '8081']
+                            ['python3', DirOffset + 'applications/operation_server.py', '8081']
                 ]
 
             # Define Applications as tuple (<host address>, <[args to the application]>)
@@ -101,7 +102,7 @@ try:
 
                 # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
                 NetworkNodes = [NetworkArg,
-                                ['python3', DirOffset + 'applications/operation-server.py', '8081']
+                                ['python3', DirOffset + 'applications/operation_server.py', '8081']
                                 ]
 
                 # Define Applications as tuple (<host address>, <[args to the application]>)

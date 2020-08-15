@@ -4,8 +4,7 @@ import time
 import json
 import sys
 
-# server for running applications on testing hosts, the specific applications will "inhereit" this class and build specific logic
-
+# Server for running/stopping/checking on applications running on hosts started by this server
 # Get will advertise the testing application's status, running, time running, application executing, etc
 
 global ApplicationProcs
@@ -20,6 +19,20 @@ CommandDescriptions = {
     '/processStart/':   '<args>',
     '/processStop/':    'optional <processID>'
 }
+
+def PrepareOperationServerArgs(dirOffset='./', opServerPort=8081):
+    '''
+    Returns list of args for use in Popen()
+
+            Parameters:
+                    dirOffset (str): Path to get to the root directory of the project. for python use
+                    opServerPort (int): Port to listen for incoming operation calls
+
+            Returns:
+                    argList (list): List of args for use in Popen()
+    '''
+    return ['python3', '{}applications/operation_server.py'.format(dirOffset), '{}'.format(opServerPort)]
+
 
 class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -148,6 +161,7 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
         # Finish web transaction
         self.wfile.write(returnCommandsJson.encode())
 
+
 class OperationServer(object):
     def __init__(self, serverAddress, port):
         self.serverAddress = (serverAddress, port)
@@ -171,6 +185,8 @@ if __name__ == '__main__':
 
     # ==============================
 
+    #print(sys.argv)
+
     webserver = OperationServer(address, port)
 
     try:
@@ -178,6 +194,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print()
     except Exception as ex:
-        print()
+        print(str(ex))
     finally:
         webserver.cleanup()

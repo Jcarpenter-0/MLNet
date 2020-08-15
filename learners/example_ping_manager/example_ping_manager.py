@@ -9,7 +9,6 @@ class Learner(learners.learner_common.KerasBlackBox):
             learnerName=learnerName,
             learnerMode=learnerMode,
             validationPattern=validationPattern
-                         , epsilon=65
                          , inputFieldNames=[
                     "-c",
                     "-s",
@@ -22,15 +21,14 @@ class Learner(learners.learner_common.KerasBlackBox):
                     "-s": range(56, 896, 56),
                     "-t": [255]
             }
-                         , targetFields=[
+                         , targetFieldNames=[
                     "packetLoss",
                     "rttAvg"
             ]
                          , epochs=24
                          , normalizationApproach='l2'
                          , normalizationAxis=1
-                         , traceFilePrefix=traceFilePrefix
-                         , fieldsExemptFromNormalization=[])
+                         , traceFilePrefix=traceFilePrefix)
 
     def Reward(self, stateData):
         row = stateData.iloc[0]
@@ -39,25 +37,27 @@ class Learner(learners.learner_common.KerasBlackBox):
         return reward
 
     def BaseModelGeneration(self, modelName, inputCount):
-        model = keras.models.Sequential()
-
-        # Define model
-
-        # Input layer
-        model.add(keras.layers.Dense(50, input_shape=(inputCount,), activation='relu'))
-
-        # Hidden layer
-        model.add(keras.layers.Dense(50, activation='relu'))
-        model.add(keras.layers.Dense(50, activation='relu'))
-
-        # Output layer
-        model.add(keras.layers.Dense(1))
-
         # Check for existing model to load in
         if os.path.exists(self.ModelFolderRoot + modelName):
-            model.load_weights(self.ModelFolderRoot + modelName)
+            model = keras.models.load_model(self.ModelFolderRoot + modelName)
 
-        # Finally put model together for training
-        model.compile(optimizer='SGD', loss='mean_squared_error', metrics=['acc'])
+            print('Previous model loaded')
+        else:
+            model = keras.models.Sequential()
+
+            # Define model
+
+            # Input layer
+            model.add(keras.layers.Dense(50, input_shape=(inputCount,), activation='relu'))
+
+            # Hidden layer
+            model.add(keras.layers.Dense(50, activation='relu'))
+            model.add(keras.layers.Dense(50, activation='relu'))
+
+            # Output layer
+            model.add(keras.layers.Dense(1))
+
+            # Finally put model together for training
+            model.compile(optimizer='SGD', loss='mean_squared_error', metrics=['acc'])
 
         return model

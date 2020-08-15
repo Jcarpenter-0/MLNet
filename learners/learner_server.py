@@ -12,9 +12,14 @@ import signal
 
 # POST will receive data from applications and then send back responses
 
-Learner = None
+_serverLearnerModule = None
+
 
 def parseArgs(verbose=False):
+    '''
+        Just parses the common args passed to the server: port, address, mode, name, etc
+    '''
+
     # Parse Args
     if verbose:
         print('sys args:' + str(sys.argv))
@@ -24,8 +29,8 @@ def parseArgs(verbose=False):
         address = sys.argv[2]
     except:
         pass
-    modelMode = int(sys.argv[3])
-    modelName = sys.argv[4]
+    learnerMode = int(sys.argv[3])
+    learnerName = sys.argv[4]
     traceFilePrefix = ''
     try:
         traceFilePrefix = sys.argv[5]
@@ -37,12 +42,81 @@ def parseArgs(verbose=False):
     except:
         pass
 
+    return port, address, learnerMode, learnerName, validationPatternFilePath, traceFilePrefix
 
-    return port, address, modelMode, modelName, validationPatternFilePath, traceFilePrefix
 
+class LearnerNode(object):
+
+    def __init__(self,
+                 learnerTypeName
+                 , learnerPort=8080
+                 , learnerAddress='localhost'
+                 , learnerMode=1
+                 , learnerLabel=None
+                 , traceLabel=None
+                 , validationPatternFilePath=None
+                 , dirOffset='./'):
+        """
+
+        """
+        self.LearnerTypeName = learnerTypeName
+        self.LearnerPort = learnerPort
+        self.LearnerAddress = learnerAddress
+        if self.LearnerAddress is None:
+            self.LearnerAddress = ''
+
+        self.LearnerMode = learnerMode
+        self.LearnerLabel = learnerLabel
+        if self.LearnerLabel is None:
+            self.LearnerLabel = ''
+
+        self.TraceLabel = traceLabel
+        if self.TraceLabel is None:
+            self.TraceLabel = ''
+
+        self.ValidationPatternFilePath = validationPatternFilePath
+        if validationPatternFilePath is None:
+            self.ValidationPatternFilePath = ''
+
+        self.BaseCommand = ['python3', '{}learners/{}/run-stub.py'.format(dirOffset, learnerTypeName)]
+
+    def ToArgs(self, shell=False):
+        """
+        :return: a list of cmd line args for use in Popen or cmd
+        """
+
+        if shell:
+            # return as a string
+            return '{} {} {} {} {} {} {} {}'.format(
+                self.BaseCommand[0]
+                , self.BaseCommand[1]
+                , self.LearnerPort
+                , self.LearnerAddress
+                , self.LearnerMode
+                , self.LearnerLabel
+                , self.TraceLabel
+                , self.ValidationPatternFilePath)
+        else:
+            # return as a python list
+
+            commandArgs = self.BaseCommand.copy()
+
+            commandArgs.extend([
+                 '{}'.format(self.LearnerPort)
+                , self.LearnerAddress
+                , '{}'.format(self.LearnerMode)
+                , self.LearnerLabel
+                , self.TraceLabel
+                , self.ValidationPatternFilePath])
+
+            return commandArgs
+
+
+# Hack to force server to use server properly
 def DefineLearner(learner):
-    global Learner
-    Learner = learner
+    global _serverLearnerModule
+    _serverLearnerModule = learner
+
 
 class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -62,7 +136,7 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
         # http version
         httpVersion = self.protocol_version
 
-        descriptionDict = Learner.Describe()
+        descriptionDict = _serverLearnerModule.Describe()
 
         jsonDescription = json.dumps(descriptionDict, indent=5)
 
@@ -86,7 +160,7 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
         stateData = json.loads(postDataRaw)
 
         # Call Learner's Operate, this will do the Observation -> Act (or Train and Act) or Train only or act only
-        returnCommandsDict = Learner.Operate(stateData)
+        returnCommandsDict = _serverLearnerModule.Operate(stateData)
 
         # Convert commands to Json
         returnCommandsJson = json.dumps(returnCommandsDict, indent=5)
@@ -97,6 +171,7 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
 
         # Finish web transaction
         self.wfile.write(returnCommandsJson.encode())
+
 
 class OperationServer(object):
     def __init__(self, serverAddress, port):
@@ -112,5 +187,5 @@ class OperationServer(object):
     def cleanup(self):
         print('Learner Server Cleaning up')
         self.Operate = False
-        Learner.Conclude()
+        _serverLearnerModule.Conclude()
         self.httpd.shutdown()

@@ -20,14 +20,14 @@ class CCLearner(learners.learner_common.KerasBlackBox):
                 'vegas': range(0, 1),
                 'reno': range(0, 1)
             }
-            , targetFields=[
+            , targetFieldNames=[
                 'bps-1'
                 ,'retransmits-1'
             ]
                                         , learnerName=learnerName
                                         , learnerMode=learnerMode
                                         , validationPattern=validationPattern
-                                        , epsilon=65
+                                        , explorePercentage=65
                                         , epochs=30
                                         , normalizationApproach='l2'
                                         , normalizationAxis=1
@@ -71,25 +71,26 @@ class CCLearner(learners.learner_common.KerasBlackBox):
 
     def BaseModelGeneration(self, modelName, inputCount):
 
-        model = keras.models.Sequential()
-
-        # Define model
-
-        # Input layer
-        model.add(keras.layers.Dense(50, input_shape=(inputCount,), activation='relu'))
-
-        # Hidden layer
-        model.add(keras.layers.Dense(50, activation='relu'))
-        model.add(keras.layers.Dense(50, activation='relu'))
-
-        # Output layer
-        model.add(keras.layers.Dense(1))
-
         # Check for existing model to load in
         if os.path.exists(self.ModelFolderRoot + modelName):
-            model.load_weights(self.ModelFolderRoot + modelName)
+            model = keras.models.load_model(self.ModelFolderRoot + modelName)
+            print('Previous model loaded')
+        else:
+            model = keras.models.Sequential()
 
-        # Finally put model together for training
-        model.compile(optimizer='SGD', loss='mean_squared_error', metrics=['acc'])
+            # Define model
+
+            # Input layer
+            model.add(keras.layers.Dense(50, input_shape=(inputCount,), activation='relu'))
+
+            # Hidden layer
+            model.add(keras.layers.Dense(50, activation='relu'))
+            model.add(keras.layers.Dense(50, activation='relu'))
+
+            # Output layer
+            model.add(keras.layers.Dense(1))
+
+            # Finally put model together for training
+            model.compile(optimizer='SGD', loss='mean_squared_error', metrics=['acc'])
 
         return model

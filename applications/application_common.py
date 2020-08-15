@@ -15,6 +15,8 @@ def ConvertArgDictToArgList(argDict):
     return argList
 
 def SendToLearner(dataDict, learnerTarget, verbose=False):
+    """Send a python dict of keys/values to a targeted learner host"""
+
     # Send to learner, and get new action
     if verbose:
         print('application sending {}'.format(dataDict))

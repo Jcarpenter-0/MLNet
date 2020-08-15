@@ -8,11 +8,6 @@
 # https://unix.stackexchange.com/questions/278215/add-tcp-congestion-control-variant-to-linux-ubuntu
 # https://www.techrepublic.com/article/how-to-enable-tcp-bbr-to-improve-network-speed-on-linux/
 
-#CURDIR=$PWD
-#cd ../../
-#sh ./01-setup-python-project-dir.sh
-#cd $CURDIR
-
 echo "Current CC's Configured on Host"
 sysctl net.ipv4.tcp_available_congestion_control
 
@@ -41,4 +36,4 @@ sysctl net.ipv4.tcp_congestion_control
 sudo sysctl -w net.ipv4.ip_forward=1
 
 # Run Experiment Setup
-python3 experiment_02_2_nodes.py
+python3 exp_03_01_compete_unaware_same_node.py
