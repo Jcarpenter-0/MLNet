@@ -1,4 +1,4 @@
-import applications.operation_server
+import applications.daemon_server
 import subprocess
 
 class Node(object):
@@ -32,7 +32,7 @@ class Node(object):
 def SetupLocalHost(daemonServerPort=7080, dirOffset='./'):
 
     # run daemon server
-    opServerArgs = applications.operation_server.PrepareOperationServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
+    opServerArgs = applications.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
 
     opProc = subprocess.Popen(opServerArgs,
     stdout=subprocess.PIPE,

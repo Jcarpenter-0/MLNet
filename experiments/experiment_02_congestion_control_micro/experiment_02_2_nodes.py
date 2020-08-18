@@ -65,7 +65,7 @@ try:
 
         NetworkArg = topo.copy()
 
-        NetworkArg.extend(['python3', DirOffset + 'applications/operation_server.py', '8081'])
+        NetworkArg.extend(['python3', DirOffset + 'applications/daemon_server.py', '8081'])
 
         for topoPara in topo:
             logPrefix += '-{}'.format(topoPara)
@@ -73,12 +73,12 @@ try:
         for learnerMode in LearnerModes:
 
             # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path> (optional) <tracefile prefix>)
-            Learners = [('congestion_control_manager_micro', '8080', '', learnerMode, learnerName, logPrefix, '')
+            Learners = [('congestion_control_manager', '8080', '', learnerMode, learnerName, logPrefix, '')
                         ]
 
             # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
             NetworkNodes = [NetworkArg,
-                            ['python3', DirOffset + 'applications/operation_server.py', '8081']
+                            ['python3', DirOffset + 'applications/daemon_server.py', '8081']
                 ]
 
             # Define Applications as tuple (<host address>, <[args to the application]>)
@@ -97,12 +97,12 @@ try:
 
             for validationIteration in range(0, ValidationCount):
                 # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path> (optional) <tracefile prefix>)
-                Learners = [('congestion_control_manager_micro', '8080', '', '2', learnerName, logPrefix, validationPattern)
+                Learners = [('congestion_control_manager', '8080', '', '2', learnerName, logPrefix, validationPattern)
                                 ]
 
                 # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
                 NetworkNodes = [NetworkArg,
-                                ['python3', DirOffset + 'applications/operation_server.py', '8081']
+                                ['python3', DirOffset + 'applications/daemon_server.py', '8081']
                                 ]
 
                 # Define Applications as tuple (<host address>, <[args to the application]>)

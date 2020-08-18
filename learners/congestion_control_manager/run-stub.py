@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
 
     # EDIT - Define the learner===========================================
-    from learners.congestion_control_manager_micro.cc_learner import CCLearner
+    from learners.congestion_control_manager.cc_learner import CCLearner
     learner = CCLearner(learnerMode=mode, learnerName=name, validationPattern=validationPatternDF, traceFilePrefix=traceFilePrefix)
     # ====================================================================
 

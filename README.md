@@ -12,19 +12,11 @@ Networking-oriented machine learning platform
 # Running Standalone modules
 Each component of the framework is standalone running from HTTP Web servers with a REST-like type microservice structure.
 GET will provide information about a module to a requester and POST will handle operations (learning/action requesting for users and application management for testing).
-* Run the Learner Module by running the "run-stub.py [port to listen on] [0 or 1 for not training and training]" for a specific model under the directory "learners/"
-* Run the Operation Module by running the "operation_server.py [port to listen on]" in "applications/". Then POST command line args to the server to run/manage host applications.
 
-# Running Using the Basic Framework
-A basic framework is provided that provides a space to setup experimental parameters via python script.
+* See applications directory readme for application specific information
 
-* Example in "experiments/example_01_example/experiment_01_example.py"
+* See experiments directory readme for how to setup tests
 
-# Building a Learner
-* Create a new folder in learners/ and add two python files (a copy of run-stub.py modified to import the proper RL you wish to use and a file that inhereits the RL core from learner_common.py)
-* In the new copy of inheritence file, define a reward from the state you expect (as a python dict, you select the textual field labels you wish to use)
-* Modify the construction of the RL class to fit particular hyper parameters you desire (layers, epochs, etc)
+* See learners directory readme for how to run and setup learners
 
-# Tips for doing Machine Learning
-* Use only numeric data, text will not translate properly, use a mapping to either numeric values or binary columns to address
-* Consider using data that is "relevant" to achieving an end, this is a heuristic
+* See networks directory readme for how to use network sims

@@ -50,7 +50,7 @@ class LearnerNode(object):
     def __init__(self,
                  learnerTypeName
                  , learnerPort=8080
-                 , learnerAddress='localhost'
+                 , learnerAddress=None
                  , learnerMode=1
                  , learnerLabel=None
                  , traceLabel=None

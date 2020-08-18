@@ -8,14 +8,13 @@ if __name__ == '__main__':
     sys.path.insert(0, '../')
 
 import networks.common
-import applications.operation_server
+import applications.daemon_server
 
 class MahiMahiShell():
 
     def __init__(self):
         self.Command = None
         self.Args = []
-
 
     def CreateArgsList(self):
         """
@@ -91,7 +90,7 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
         mmProc.wait()
 
         # add the operation server command
-        mmCommands.extend(applications.operation_server.PrepareOperationServerArgs(dirOffset=dirOffset, opServerPort=opServerPort))
+        mmCommands.extend(applications.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=opServerPort))
 
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,

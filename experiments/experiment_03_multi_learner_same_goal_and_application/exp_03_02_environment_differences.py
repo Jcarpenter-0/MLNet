@@ -57,7 +57,7 @@ print('Tests planned {} - Time ~{} hours'.format(TestCount, (TestTimeEstimate / 
 input("Press Enter to continue... or ctrl-c to stop")
 
 
-LocalSideNetworkingArg = ['python3', DirOffset + 'applications/operation_server.py', '8081']
+LocalSideNetworkingArg = ['python3', DirOffset + 'applications/daemon_server.py', '8081']
 
 # Number of iperf runs to attempt
 IperfRuns = 1000
@@ -70,7 +70,7 @@ Applications = [
     , ('http://localhost:8081', ['iperf3', '-s'])
             ]
 
-LearnerName = 'congestion_control_manager_micro'
+LearnerName = 'congestion_control_manager'
 LearnerPort = '8080'
 LearnerAddr = ''
 LearnerLabel = 'exp-03-02-{}-{}'

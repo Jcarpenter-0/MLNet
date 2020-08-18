@@ -33,14 +33,14 @@ ValidationPatterns = [
 ]
 
 NetworkNodes = [
-    ['mm-delay', '40', 'python3', DirOffset + 'applications/operation_server.py', '8079'],
-    ['python3', DirOffset + 'applications/operation_server.py', '8079']
+    ['mm-delay', '40', 'python3', DirOffset + 'applications/daemon_server.py', '8079'],
+    ['python3', DirOffset + 'applications/daemon_server.py', '8079']
 ]
 
 LearnerStartPort = 8080
 ApplicationStartPort = LearnerStartPort + NumberOfLearners
 
-LearnerName = 'congestion_control_manager_micro'
+LearnerName = 'congestion_control_manager'
 LearnerLabel = 'exp-03-01-{}-{}'
 LearnerLogPrefix = '{}'
 

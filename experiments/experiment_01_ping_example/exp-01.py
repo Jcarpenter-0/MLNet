@@ -9,16 +9,16 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 import experiments.experiments_common
 import learners.learner_server
-import applications.operation_server
+import networks.mahimahi
+import networks.common
 
-# Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path>)
-Learners = [learners.learner_server.LearnerNode('example_ping_manager', dirOffset=DirOffset).ToArgs()]
+# Define Learners
+pingManager = learners.learner_server.LearnerNode('example_ping_manager', dirOffset=DirOffset)
 
-netArgs = ['mm-delay', '20']
+# Define network nodes
+pingNode = networks.mahimahi.SetupMahiMahiNode([networks.mahimahi.MahiMahiDelayShell(delayMS=10)], dirOffset=DirOffset)
 
-netArgs.extend(applications.operation_server.PrepareOperationServerArgs(dirOffset=DirOffset))
+pingNode.AddApplication(['python3', '{}applications/Ping/Ping.py'.format(DirOffset), '100.64.0.1', '-c', '10', '-s', '56', '-t', '255', '1000', 'http://100.64.0.1:{}'.format(pingManager.LearnerPort)])
 
-# Define Applications as tuple (<host address>, <[args to the application]>)
-Applications = [('http://100.64.0.2:8081', ['python3', DirOffset + 'applications/Ping/Ping.py', '100.64.0.1', '-c', '10', '-s', '56', '-t', '255', '1000', 'http://100.64.0.1:8080'])]
-
-experiments.experiments_common.runExperiment([netArgs], Learners, Applications, 1800, 10, 10, DirOffset)
+# run experiment
+experiments.experiments_common.runExperimentUsingFramework([pingNode], [pingManager], 30)

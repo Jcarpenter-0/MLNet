@@ -20,7 +20,7 @@ CommandDescriptions = {
     '/processStop/':    'optional <processID>'
 }
 
-def PrepareOperationServerArgs(dirOffset='./', opServerPort=8081):
+def PrepareServerArgs(dirOffset='./', opServerPort=8081):
     '''
     Returns list of args for use in Popen()
 
@@ -31,10 +31,10 @@ def PrepareOperationServerArgs(dirOffset='./', opServerPort=8081):
             Returns:
                     argList (list): List of args for use in Popen()
     '''
-    return ['python3', '{}applications/operation_server.py'.format(dirOffset), '{}'.format(opServerPort)]
+    return ['python3', '{}applications/daemon_server.py'.format(dirOffset), '{}'.format(opServerPort)]
 
 
-class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
+class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
 
     # GET Report the status of the running application(s)
     def do_GET(self):
@@ -162,10 +162,10 @@ class OperationServerHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(returnCommandsJson.encode())
 
 
-class OperationServer(object):
+class DaemonServer(object):
     def __init__(self, serverAddress, port):
         self.serverAddress = (serverAddress, port)
-        self.httpd = http.server.HTTPServer(self.serverAddress, OperationServerHandler)
+        self.httpd = http.server.HTTPServer(self.serverAddress, DaemonServerHandler)
 
     def run(self):
         self.httpd.serve_forever()
@@ -185,15 +185,17 @@ if __name__ == '__main__':
 
     # ==============================
 
-    #print(sys.argv)
+    daemonServer = DaemonServer(address, port)
 
-    webserver = OperationServer(address, port)
+    # 0.0.0.0 means listen on any address, stating localhost breaks it for external connections
+    print('Server up http://0.0.0.0:{}/'.format(port))
 
     try:
-        webserver.run()
+        daemonServer.run()
     except KeyboardInterrupt:
         print()
     except Exception as ex:
         print(str(ex))
     finally:
-        webserver.cleanup()
+        daemonServer.cleanup()
+        print('Server cleaned up')

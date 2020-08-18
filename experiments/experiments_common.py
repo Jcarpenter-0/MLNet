@@ -123,8 +123,10 @@ def runExperimentUsingFramework(networkNodes, learnerNodes, testDuration, server
             # Adjust the ports so there is no overlap
             learnerNode.LearnerPort = learnerNode.LearnerPort + learnerNum
 
-            learnerProcs.append(subprocess.Popen(learnerNode.ToArgs()))
-            print('Learner: {} - {} - {} online at http://{}:{}/'.format(learnerNode.LearnerTypeName, learnerNode.LearnerLabel, learnerNum, learnerNode.LearnerAddress, learnerNode.LearnerPort))
+            newProc = subprocess.Popen(learnerNode.ToArgs())
+
+            learnerProcs.append(newProc)
+            print('Learner: {} - {} - {} {} at http://{}:{}/'.format(learnerNode.LearnerTypeName, learnerNode.LearnerLabel, learnerNum, newProc.returncode, learnerNode.LearnerAddress, learnerNode.LearnerPort))
 
         # Wait for servers to go up
         time.sleep(serverCooldown)
@@ -143,7 +145,8 @@ def runExperimentUsingFramework(networkNodes, learnerNodes, testDuration, server
                     jsonBody = json.dumps(writeDict).encode()
 
                     # send to the host server to start the application
-                    print('Application: {} to {}'.format(node.IpAddress, writeDict))
+                    print('Application: {} to http://{}:{}/'.format(writeDict, node.IpAddress, node.DaemonPort))
+
                     response = requests.post('http://{}:{}/processStart/'.format(node.IpAddress, node.DaemonPort), data=jsonBody)
                     if response.ok is False:
                         raise Exception("Problem raising process on node {} : {}".format(node.IpAddress, response.text))
