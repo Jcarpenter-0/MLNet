@@ -3,7 +3,7 @@ import numpy as np
 import glob
 import json
 
-RESULTDIR = '../tmp-01/'
+RESULTDIR = '../tmp-1/'
 
 def ParseReports():
 
@@ -139,6 +139,8 @@ def ParseTraces():
         testTogetherStepCount = 0
 
         for traceFile in testTogetherTraceFiles:
+
+            print('Attempting to Read {}'.format(traceFile))
 
             traceDF = pd.read_csv(traceFile)
 

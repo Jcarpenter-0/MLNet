@@ -1,5 +1,8 @@
 # Simple CC experiment, involving two nodes
 import numpy as np
+import glob
+import random
+import math
 
 # Setup the dir
 DirOffset = '../../'
@@ -8,117 +11,130 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
-import experiments.experiments_common
-import learners.learner_common
+import networks.mahimahi
+import networks.common
+import experiments.common
 
-ExperimentLengthSeconds = 1800
+# Experiment Parameters
+TraceDir = './mahimahi-traces/'
+TrainPercentage = 0.80
+TestPercentage = 1 - TrainPercentage
+TestRepetitions = 10
+VerificationPatternFiles = ['./bbr-pattern.csv', './cubic-pattern.csv', './reno-pattern.csv', './vegas-pattern.csv']
+ExperimentRunTime = 1800
+IperfRunCount = 1000
+IperfRunLength = 10
 
-# Number of iperf runs to attempt
-IperfRuns = 1000
+# Get the traces
+Traces = glob.glob(TraceDir + '*')
+TrainingTracesCount = math.ceil(len(Traces) * TrainPercentage)
+TestingTracesCount = math.floor(len(Traces) * TestPercentage)
 
-# How long the iperf runs should attempt to go for
-IperfRunLengthSeconds = 10
-
-# Post-test cooldown
-PostTestTimeBufferSecods = 10
-
-# For other time estimations
-ArbitraryTimeAddSeconds = 7
-
-# Train, Validate, then Test
-LearnerModes = ['1', '0']
-# Number of times to run validation
-ValidationCount = 1
-ValidationPatterns = [
-    './cubic-pattern.csv',
-    './bbr-pattern.csv',
-    './vegas-pattern.csv',
-    './reno-pattern.csv'
-]
-
+# Build the topologies (environments)
 Topologies = []
 
-# Generate Topology args
-for delay in range(10, 20, 10):
-    delayCommand = ['mm-delay', '{}'.format(delay)]
-    Topologies.append(delayCommand)
+for traceFile in Traces:
+    Topologies.append(networks.mahimahi.MahiMahiLinkShell(traceFile, traceFile))
 
-for linkDirection in ['uplink', 'downlink']:
+# Divide into training and testing, select randomly from the whole set
+TestingTopologies = []
+TrainingTopologies = []
 
-    for lossRate in np.arange(0.1, 0.2, 0.1):
-        lossCommand = ['mm-loss', linkDirection, '{}'.format(lossRate)]
-        Topologies.append(lossCommand)
+topoCopy = Topologies.copy()
 
-VariationCount = (len(LearnerModes) * len(Topologies)) + (len(ValidationPatterns) * ValidationCount)
-print('Tests planned {} - Time ~{} hours'.format(VariationCount, ((ExperimentLengthSeconds + (2 * PostTestTimeBufferSecods) + ArbitraryTimeAddSeconds) * VariationCount)/60/60))
+for trainingNum in range(0, TrainingTracesCount):
+    # Select a trace
+    traceIndex = random.randint(0, len(topoCopy)-1)
+    trace = topoCopy.pop(traceIndex)
+    TrainingTopologies.append(trace)
+
+# Remaining traces are for testing
+TestingTopologies.extend(topoCopy)
+
+# Do the meta calculations
+NumberOfTests = len(TrainingTopologies) + (len(TestingTopologies) * TestRepetitions) + (len(TestingTopologies) * TestRepetitions * len(VerificationPatternFiles))
+TotalTimeInSeconds = NumberOfTests * ExperimentRunTime
+
+print('Tests planned {} - Time ~{} hours'.format(NumberOfTests, TotalTimeInSeconds/60/60))
 input("Press Enter to continue... or ctrl-c to stop")
 
-CurrentTestID = 0
+# Train
+for trnEnv in TrainingTopologies:
 
-try:
+    # Setup the learners
+    ccLearner = experiments.common.Learner(
+        '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
+        , traceFilePostFix=trnEnv.GetParaString() + '_trn')
 
-    for topo in Topologies:
+    # Define network nodes
+    iperfClientNode = networks.common.SetupLocalHost(dirOffset=DirOffset)
 
-        print('Test {}/{}'.format(CurrentTestID, VariationCount))
-        learnerName = 'exp-02-cc-learner-{}'.format(CurrentTestID)
-        logPrefix = 'env'
+    iperfServerNode = networks.mahimahi.SetupMahiMahiNode([trnEnv], dirOffset=DirOffset)
 
-        NetworkArg = topo.copy()
+    iperfClientNode.AddApplication(
+        ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+            ,'-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
+         '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearner.LearnerPort)])
 
-        NetworkArg.extend(['python3', DirOffset + 'applications/daemon_server.py', '8081'])
+    iperfServerNode.AddApplication(['iperf3', '-s'])
 
-        for topoPara in topo:
-            logPrefix += '-{}'.format(topoPara)
+    # run experiment
+    experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner], ExperimentRunTime)
 
-        for learnerMode in LearnerModes:
+# Test
+for tstEnv in TestingTopologies:
 
-            # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path> (optional) <tracefile prefix>)
-            Learners = [('congestion_control_manager', '8080', '', learnerMode, learnerName, logPrefix, '')
-                        ]
+    for testRep in range(0, TestRepetitions):
+        # Setup the learners
+        ccLearner = experiments.common.Learner(
+            '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
+            , training=0
+            , traceFilePostFix=tstEnv.GetParaString() + '_tst_{}'.format(testRep))
 
-            # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
-            NetworkNodes = [NetworkArg,
-                            ['python3', DirOffset + 'applications/daemon_server.py', '8081']
-                ]
+        # Define network nodes
+        iperfClientNode = networks.common.SetupLocalHost(dirOffset=DirOffset)
 
-            # Define Applications as tuple (<host address>, <[args to the application]>)
-            Applications = [('http://100.64.0.2:8081', [
-                'python3'
-                , DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'
-                ,'-c', '100.64.0.1', '-t', '{}'.format(IperfRunLengthSeconds), '{}'.format(IperfRuns), 'http://100.64.0.1:8080'])
-                , ('http://localhost:8081', ['iperf3', '-s'])
-                            ]
+        iperfServerNode = networks.mahimahi.SetupMahiMahiNode([tstEnv], dirOffset=DirOffset)
 
-            experiments.experiments_common.runExperiment(NetworkNodes, Learners, Applications, ExperimentLengthSeconds, PostTestTimeBufferSecods, PostTestTimeBufferSecods, DirOffset, True)
-            CurrentTestID += 1
+        iperfClientNode.AddApplication(
+            ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                , '-c', '100.64.0.1', '-t', '{}'.format(IperfRunLength),
+             '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearner.LearnerPort)])
 
-        # Do validation runs
-        for validationPattern in ValidationPatterns:
+        iperfServerNode.AddApplication(['iperf3', '-s'])
 
-            for validationIteration in range(0, ValidationCount):
-                # Define Learners as tuple (<name of learner>, <port>, <mode>, <model name>, (optional) <validation pattern file path> (optional) <tracefile prefix>)
-                Learners = [('congestion_control_manager', '8080', '', '2', learnerName, logPrefix, validationPattern)
-                                ]
+        # run experiment
+        experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner],
+                                                       ExperimentRunTime)
 
-                # Define Network as tuple for each node (<[script commands to setup a node and the server code]>)
-                NetworkNodes = [NetworkArg,
-                                ['python3', DirOffset + 'applications/daemon_server.py', '8081']
-                                ]
+# Verify
+for tstEnv in TestingTopologies:
 
-                # Define Applications as tuple (<host address>, <[args to the application]>)
-                Applications = [('http://100.64.0.2:8081', [
-                    'python3'
-                    , DirOffset + 'applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'
-                    , '-c', '100.64.0.1', '-t', '{}'.format(IperfRunLengthSeconds), '{}'.format(IperfRuns),
-                    'http://100.64.0.1:8080'])
-                    , ('http://localhost:8081', ['iperf3', '-s'])
-                                ]
+    for testRep in range(0, TestRepetitions):
 
-                experiments.experiments_common.runExperiment(NetworkNodes, Learners, Applications, ExperimentLengthSeconds, PostTestTimeBufferSecods, PostTestTimeBufferSecods,
-                                                                 DirOffset, True)
-                CurrentTestID += 1
+        for verPattern in VerificationPatternFiles:
+            # Setup the learners
+            ccLearner = experiments.common.Learner(
+                '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
+                , training=2
+                , traceFilePostFix=tstEnv.GetParaString() + '_{}_{}'.format(testRep, verPattern.replace('.','').replace('/',''))
+                , miscArgs=[verPattern])
 
-except KeyboardInterrupt:
-    print('')
-except Exception as ex:
-    print(str(ex))
+            # Define network nodes
+            iperfClientNode = networks.common.SetupLocalHost(dirOffset=DirOffset)
+
+            iperfServerNode = networks.mahimahi.SetupMahiMahiNode([tstEnv], dirOffset=DirOffset)
+
+            iperfClientNode.AddApplication(
+                ['python3',
+                 '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                    , '-c', '100.64.0.1', '-t', '{}'.format(IperfRunLength),
+                 '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearner.LearnerPort)])
+
+            iperfServerNode.AddApplication(['iperf3', '-s'])
+
+            # run experiment
+            experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner],
+                                                           ExperimentRunTime)
+
+print('Experiment Done')

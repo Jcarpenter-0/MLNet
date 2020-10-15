@@ -28,6 +28,8 @@ class Node(object):
             self.NodeProc.kill()
             self.NodeProc.wait()
 
+        print(self.IpAddress + ' shutdown')
+
 
 def SetupLocalHost(daemonServerPort=7080, dirOffset='./'):
 

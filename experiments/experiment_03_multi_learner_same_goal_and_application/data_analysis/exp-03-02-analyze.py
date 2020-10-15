@@ -3,7 +3,7 @@ import numpy as np
 import glob
 import json
 
-RESULTDIR = '../tmp-02/'
+RESULTDIR = '../tmp-2/'
 
 Environments = [
     'env-mm-delay-0',

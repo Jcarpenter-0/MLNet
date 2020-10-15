@@ -4,6 +4,8 @@
 
 #sudo apt-get update
 #sudo apt-get -y install python3-pip
+# Update pip
+# pip install --upgrade pip
 
 # Install pip3
 sudo apt install python3-pip

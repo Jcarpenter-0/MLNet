@@ -12,8 +12,8 @@ import experiments.experiments_common
 
 
 NumberOfLearners = 2
-TrainingCount = 4
-TestingCount = 6
+TrainingCount = 2
+TestingCount = 2
 
 
 ExperimentLengthSeconds = 1800
@@ -24,7 +24,7 @@ PostTestTimeBufferSecods = 10
 # For other time estimations
 ArbitraryTimeAddSeconds = 7
 
-ValidationCount = 1
+ValidationCount = 2
 ValidationPatterns = [
     './cubic-pattern.csv',
     './bbr-pattern.csv',
@@ -223,7 +223,7 @@ try:
 
             for learnerNum in range(0, NumberOfLearners):
                 singleUseLearnerConfig = [(LearnerName, '{}'.format(LearnerStartPort + learnerNum), '', '2',
-                                           'validator-{}'.format(index), traceLabel, validationPattern)]
+                                           'validator-{}-{}'.format(index,learnerNum), traceLabel, validationPattern)]
 
                 learners.extend(singleUseLearnerConfig.copy())
 
@@ -235,6 +235,8 @@ try:
                       'http://100.64.0.1:{}'.format(LearnerStartPort + learnerNum)])
                     , ('http://localhost:8079', ['iperf3', '-s', '-p', '{}'.format(ApplicationStartPort + learnerNum)])
                 ]
+
+                print(str(singleUseAppCommand))
 
                 applications.extend(singleUseAppCommand.copy())
 
@@ -250,7 +252,7 @@ try:
 
             for learnerNum in range(0, NumberOfLearners):
                 singleUseLearnerConfig = [(LearnerName, '{}'.format(LearnerStartPort + learnerNum), '', '2',
-                                           'validator-{}'.format(index), traceLabel, validationPattern)]
+                                           'validator-{}-{}'.format(index,learnerNum), traceLabel, validationPattern)]
 
                 singleUseAppCommand = [
                     ('http://100.64.0.2:8079',
@@ -260,6 +262,8 @@ try:
                       'http://100.64.0.1:{}'.format(LearnerStartPort + learnerNum)])
                     , ('http://localhost:8079', ['iperf3', '-s', '-p', '{}'.format(ApplicationStartPort + learnerNum)])
                 ]
+
+                print(str(singleUseAppCommand))
 
                 experiments.experiments_common.runExperiment(NetworkNodes, singleUseLearnerConfig, singleUseAppCommand, ExperimentLengthSeconds,
                                                          PostTestTimeBufferSecods, PostTestTimeBufferSecods, DirOffset,

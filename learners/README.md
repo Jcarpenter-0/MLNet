@@ -43,6 +43,7 @@ Inside each of the learner sub directories is a <i>run-stub.py</i> file. Running
 # Troubleshooting
 * Illegal operation (core dumped)
 Check tensorflow, it may be running a new version on an older cpu
+* Shape input issues? Try ensuring that keras and tensorflow are updated properly
 
 # Tips for doing Machine Learning
 * Use only numeric data, text will not translate properly, use a mapping to either numeric values or binary columns to address

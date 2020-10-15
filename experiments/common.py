@@ -2,99 +2,65 @@ import time
 import subprocess
 import requests
 import json
+# Contains macros and fast setup abstractions
+
+# Fast setup abstractions
 
 
-def runExperiment(NetworkSetupList, Learners, Applications, TestingDuration, ServerCool, KillTimeout, dirOffset='./', keyboardInterupRaise=False):
-    """
+class Learner(object):
 
-    :param NetworkSetupList:
-    :param Learners:
-    :param Applications:
-    :param TestingDuration:
-    :param ServerCool:
-    :param KillTimeout:
-    :param dirOffset:
-    :param keyboardInterupRaise:
-    """
-    LearnersProcs = []
-    NetworkNodeProcs = []
+    def __init__(self, learnerScriptPath
+                 , learnerDir='./tmp/'
+                 , learnerPort=8080
+                 , learnerAddress=None
+                 , training=1
+                 , traceFilePostFix=''
+                 , miscArgs=[]):
+        """The abstraction of a 'learner' comprised of a ml module, problem definition,
+         and a server to host on. Intended to call a learner's setup script in /learners/ and pass some args."""
+        self.LearnerScriptPath = learnerScriptPath
+        self.LearnerPort = learnerPort
+        self.LearnerAddress = learnerAddress
+        if self.LearnerAddress is None:
+            self.LearnerAddress = ''
 
-    keyBoardInterupted = False
+        self.LearnerDir = learnerDir
+        self.Training = training
 
-    try:
+        self.BaseCommand = ['python3', '{}'.format(self.LearnerScriptPath)]
 
-        # Start Network
-        for nodeDef in NetworkSetupList:
-            NetworkNodeProcs.append(subprocess.Popen(nodeDef))
+        self.TraceFilePostFix = traceFilePostFix
+        self.MiscArgs = miscArgs
 
-        print('Network Nodes Setup')
+    def ToArgs(self, shell=False):
+        """
+        :return: a list of cmd line args for use in Popen or cmd
+        """
 
-        # Start Learners
-        for namePortTrain in Learners:
-            learnerDirName = namePortTrain[0]
-            learnerCommand = ['python3', '{}learners/{}/run-stub.py'.format(dirOffset, learnerDirName)]
-            learnerCommand.extend(namePortTrain[1:])
+        if shell:
+            # return as a string
+            return '{} {} {} {} {}'.format(
+                self.BaseCommand[0]
+                , self.BaseCommand[1]
+                , self.LearnerPort
+                , self.LearnerAddress
+                , self.Training
+                , self.LearnerDir)
+        else:
+            # return as a python list
 
-            LearnersProcs.append(subprocess.Popen(learnerCommand))
+            commandArgs = self.BaseCommand.copy()
 
-        print('Learners Setup')
+            commandArgs.extend([
+                '{}'.format(self.LearnerPort)
+                , self.LearnerAddress
+                , '{}'.format(self.Training)
+                , self.LearnerDir
+                , self.TraceFilePostFix])
 
-        # Wait for servers to go up
-        time.sleep(ServerCool)
+            commandArgs.extend(self.MiscArgs)
 
-        # Start Applications
-        for applicationTargetDef in Applications:
-            applicationHost = applicationTargetDef[0]
-            applicationArgs = applicationTargetDef[1]
-            writeDict = {'args': applicationArgs}
-
-            # convert to json
-            jsonBody = json.dumps(writeDict).encode()
-
-            # send to the host server to start the application
-            response = requests.post(applicationHost + '/processStart/', data=jsonBody)
-            print(response)
-
-        # Wait
-        time.sleep(TestingDuration)
-
-    except KeyboardInterrupt as inter:
-        keyBoardInterupted = True
-    except Exception as ex:
-        print(str(ex))
-    finally:
-        # Stop applications
-        for applicationTargetDef in Applications:
-            applicationHost = applicationTargetDef[0]
-
-            # send to the host server to start the application
-            try:
-                response = requests.post(applicationHost + '/processStop/')
-                print(response)
-            except:
-                pass
-
-        # Shutdown/Stop experiment
-        for learnerProc in LearnersProcs:
-            learnerProc.terminate()
-            try:
-                learnerProc.wait(KillTimeout)
-            except Exception as timeout:
-                learnerProc.kill()
-                learnerProc.wait()
-
-        # Stop Networks
-        for networkNode in NetworkNodeProcs:
-            networkNode.terminate()
-            try:
-                networkNode.wait(KillTimeout)
-            except Exception as timeout:
-                networkNode.kill()
-                networkNode.wait()
-
-        print('Experiment Done')
-        if keyboardInterupRaise and keyBoardInterupted:
-            raise KeyboardInterrupt
+            return commandArgs
 
 
 def runExperimentUsingFramework(networkNodes, learnerNodes, testDuration, serverCooldown=5, killTimeout=3, keyboardInterupRaise=True, shutDownNetworkWhenDone=True):
@@ -126,7 +92,7 @@ def runExperimentUsingFramework(networkNodes, learnerNodes, testDuration, server
             newProc = subprocess.Popen(learnerNode.ToArgs())
 
             learnerProcs.append(newProc)
-            print('Learner: {} - {} - {} {} at http://{}:{}/'.format(learnerNode.LearnerTypeName, learnerNode.LearnerLabel, learnerNum, newProc.returncode, learnerNode.LearnerAddress, learnerNode.LearnerPort))
+            print('Learner: {} - {} - {} {} at http://{}:{}/'.format(learnerNode.LearnerScriptPath, learnerNode.LearnerDir, learnerNum, newProc.returncode, learnerNode.LearnerAddress, learnerNode.LearnerPort))
 
         # Wait for servers to go up
         time.sleep(serverCooldown)

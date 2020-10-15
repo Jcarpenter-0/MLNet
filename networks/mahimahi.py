@@ -10,11 +10,21 @@ if __name__ == '__main__':
 import networks.common
 import applications.daemon_server
 
+
 class MahiMahiShell():
 
     def __init__(self):
         self.Command = None
         self.Args = []
+
+    def GetParaString(self):
+        """Return a string simply describing the shell. Ex: delay-10ms"""
+        descString = self.Command
+
+        for arg in self.Args:
+            descString += str(arg)
+
+        return descString
 
     def CreateArgsList(self):
         """
@@ -44,6 +54,15 @@ class MahiMahiLossShell(MahiMahiShell):
         self.Command = 'mm-loss'
         self.Args.append(linkDirection)
         self.Args.append(lossPercentage)
+        
+    def GetParaString(self):
+        paraString = super(MahiMahiLossShell, self).GetParaString()
+
+        paraString = paraString.replace('.','')
+
+        paraString = paraString.replace('/','')
+
+        return paraString
 
 
 class MahiMahiLinkShell(MahiMahiShell):
@@ -53,6 +72,15 @@ class MahiMahiLinkShell(MahiMahiShell):
         self.Command = 'mm-link'
         self.Args.append(upLinkLogFilePath)
         self.Args.append(downLinkLogFilePath)
+
+    def GetParaString(self):
+        paraString = super(MahiMahiLinkShell, self).GetParaString()
+
+        paraString = paraString.replace('.','')
+
+        paraString = paraString.replace('/','')
+
+        return paraString
 
 
 def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=8081, dirOffset='./'):
@@ -98,6 +126,8 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
                               stdin=subprocess.PIPE,
                               stderr=subprocess.STDOUT,
                               universal_newlines=True)
+
+    print('MM Node {} {} Setup'.format(ipAddress, daemonPort))
 
     return networks.common.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort)
 

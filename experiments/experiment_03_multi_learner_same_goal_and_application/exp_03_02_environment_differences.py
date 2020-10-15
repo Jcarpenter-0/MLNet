@@ -23,13 +23,13 @@ Topologies = []
 
 # Fill in topologies
 # Generate Topology args
-for delay in range(0, 50, 50):
+for delay in range(0, 200, 50):
     delayCommand = ['mm-delay', '{}'.format(delay)]
     Topologies.append(delayCommand)
 
 for linkDirection in ['uplink', 'downlink']:
 
-    for lossRate in np.arange(0.0, 0.1, 0.1):
+    for lossRate in np.arange(0.0, 0.2, 0.1):
         lossCommand = ['mm-loss', linkDirection, '{}'.format(lossRate)]
         Topologies.append(lossCommand)
 
@@ -83,7 +83,8 @@ for testID, trainingTopo in enumerate(Topologies):
     trainingenvLabel = 'trn-env'
 
     for topoPara in trainingTopo:
-        trainingenvLabel += '-{}'.format(topoPara)
+        topoParaStr = topoPara.replace('.','')
+        trainingenvLabel += '-{}'.format(topoParaStr)
 
     trainingNetworkingArg = trainingTopo.copy()
 
@@ -109,7 +110,8 @@ for testID, trainingTopo in enumerate(Topologies):
             testingEnvLabel = 'tst-env'
 
             for topoPara in testingTopo:
-                testingEnvLabel += '-{}'.format(topoPara)
+                topoParaStr = topoPara.replace('.', '')
+                testingEnvLabel += '-{}'.format(topoParaStr)
 
             # Setup Network Args
             testingNetworkArg = testingTopo.copy()
@@ -131,8 +133,10 @@ for testID, trainingTopo in enumerate(Topologies):
             # Verify the Environment
             for validationPattern in ValidationPatterns:
 
+                validationPatternName = validationPattern.split('/')[1]
+
                 verifiers = [
-                    (LearnerName, LearnerPort, LearnerAddr, '2', LearnerLabel.format(testID, validationPattern), testingEnvLabel, validationPattern)]
+                    (LearnerName, LearnerPort, LearnerAddr, '2', LearnerLabel.format(testID, validationPatternName), testingEnvLabel, validationPattern)]
 
                 experiments.experiments_common.runExperiment(testingNetworkNodes, verifiers, Applications,
                                                              ExperimentLengthSeconds, PostTestTimeBufferSecods,
