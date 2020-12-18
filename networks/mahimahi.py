@@ -1,14 +1,6 @@
 import subprocess
-
-if __name__ == '__main__':
-    print('Special imports')
-    import sys
-    import os
-    sys.path.insert(0, os.getcwd())
-    sys.path.insert(0, '../')
-
-import networks.common
-import applications.daemon_server
+import networks
+import apps.daemon_server
 
 
 class MahiMahiShell():
@@ -83,7 +75,7 @@ class MahiMahiLinkShell(MahiMahiShell):
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=8081, dirOffset='./'):
+def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./') -> networks.Node:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
@@ -97,11 +89,11 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
         mmCommands.extend(shell.CreateArgsList())
 
     # Default MahiMahi IP address
-    daemonPort = opServerPort
+    daemonPort = daemonPort
 
     ipAddress = None
 
-    if runOperationServerToo and len(mmShellsList) <= 1:
+    if runDaemonServer and len(mmShellsList) <= 1:
         # Parse the IP address of the created node
         mmProc = subprocess.Popen(mmCommands,
                                   stdout=subprocess.PIPE,
@@ -115,10 +107,8 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
         ipLinePieces = ipLineRaw.split(' ')
         ipAddress = '{}'.format(ipLinePieces[9])
 
-        mmProc.wait()
-
         # add the operation server command
-        mmCommands.extend(applications.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=opServerPort))
+        mmCommands.extend(apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
 
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,
@@ -127,9 +117,26 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
                               stderr=subprocess.STDOUT,
                               universal_newlines=True)
 
-    print('MM Node {} {} Setup'.format(ipAddress, daemonPort))
+    print('MM Node {} {} {}'.format(ipAddress, daemonPort, mmProc.returncode))
 
-    return networks.common.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort)
+    return networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort)
+
+
+def SetupMahiMahiNetwork(setupArgs:dict) -> networks.NetworkModule:
+    """Autobuilder method for creating a mahi mahi network"""
+
+
+
+
+    return None
+
+
+class MahiMahiNetworkDefinition(networks.__networkDefinition):
+
+    def Setup(self, setupArgs:dict) -> networks.NetworkModule:
+        """"""
+        return SetupMahiMahiNetwork(setupArgs)
+
 
 
 # https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
@@ -137,7 +144,13 @@ def SetupMahiMahiNode(mmShellsList, runOperationServerToo=True, opServerPort=808
 
 if __name__ == '__main__':
 
-    node = SetupMahiMahiNode([MahiMahiDelayShell(delayMS=10), MahiMahiDelayShell(delayMS=10)], dirOffset='../', runOperationServerToo=False)
+    print('Special imports')
+    import sys
+    import os
+    sys.path.insert(0, os.getcwd())
+    sys.path.insert(0, '../')
+
+    node = SetupMahiMahiNode([MahiMahiDelayShell(delayMS=10), MahiMahiDelayShell(delayMS=10)], dirOffset='../', runDaemonServer=False)
 
     print(node.IpAddress)
     print(node.NodeProc.returncode)

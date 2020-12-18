@@ -6,7 +6,7 @@ import learners.common
 import learners.preBuiltLearners
 
 
-class CongestionControlExperimentProblemDefinition(learners.common.DomainDefinition):
+class CongestionControlExperimentProblemModule(learners.common.DomainModule):
 
     def __init__(self, loggingDirPath, traceFilePostFix=''):
         super().__init__(loggingDirPath
@@ -26,7 +26,7 @@ class CongestionControlExperimentProblemDefinition(learners.common.DomainDefinit
                 'vegas': range(0, 2),
                 'reno': range(0, 2)})
 
-    def DefineActionSpace(self):
+    def DefineActionSpaceSubset(self):
 
         actions = []
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     port, address, mode, learnerDir, filePostFix, miscArgs = learners.common.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = CongestionControlExperimentProblemDefinition(learnerDir + 'Traces/', traceFilePostFix=filePostFix)
+    domainDF = CongestionControlExperimentProblemModule(learnerDir + 'Traces/', traceFilePostFix=filePostFix)
 
     # Setup the ML module
     obvFields = domainDF.ObservationFields

@@ -10,15 +10,17 @@ from sklearn import preprocessing
 ''''''
 
 # Simple script to test proper training approach
+TARGETVALUEFIELDNAME = 'rttAvg'
 Verbose = False
 
-# Report Output Header
-TrainFile = '17-07-2020-22-57-33-training-runlogs'
-TestFile = '17-07-2020-23-28-22-training-runlogs'
+# Read in data
+TrnFile = '../exps/experiment_01_ping_example/tmp/Traces/11-11-2020-11-55-43-trn-1-session-log.csv'
+TstFile = '../exps/experiment_01_ping_example/tmp/Traces/11-11-2020-12-01-11-trn-2-session-log.csv'
 
-TARGETVALUEFIELDNAME = 'bps-1'
+TrnDF = pd.read_csv(TrnFile)
+TstDF = pd.read_csv(TstFile)
 
-ReportFilePath = './Model-Training-Input-{}-Testing-Input-{}-Target-Value-{}.csv'.format(TrainFile, TestFile, TARGETVALUEFIELDNAME)
+ReportFilePath = './Model-Training-Input-Testing-Input-Target-Value-{}.csv'.format(TARGETVALUEFIELDNAME)
 ReportHeader = 'Variation-Index' \
                ',Avg-Accuracy' \
                ',Accuracy-STD' \
@@ -44,19 +46,15 @@ ReportFileDS = open(ReportFilePath, 'w')
 ReportFileDS.write(ReportHeader)
 ReportFileDS.flush()
 
-# Read in data
-INPUTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/exp-02-cc-learner/traces/{}.csv'.format(TrainFile))
-TESTDF = pd.read_csv('../../experiments/experiment_02_congestion_control_micro/tmp/exp-02-cc-learner/traces/{}.csv'.format(TestFile))
-
 # Filter
-DROPFILTER = [TARGETVALUEFIELDNAME, 'Timestamp', 'Reward', 'Exploit']
+DROPFILTER = [TARGETVALUEFIELDNAME, 'Timestamp', 'Reward']
 
-test_x = TESTDF.drop(columns=DROPFILTER)
-train_x = INPUTDF.drop(columns=DROPFILTER)
+test_x = TstDF.drop(columns=DROPFILTER)
+train_x = TrnDF.drop(columns=DROPFILTER)
 
 # targets
-train_y = INPUTDF[[TARGETVALUEFIELDNAME]]
-test_y = TESTDF[[TARGETVALUEFIELDNAME]]
+train_y = TrnDF[[TARGETVALUEFIELDNAME]]
+test_y = TstDF[[TARGETVALUEFIELDNAME]]
 
 # Get input shape
 n_cols = train_x.shape[1]
@@ -70,7 +68,7 @@ Normalizations = [
                 , 'l1'
 ]
 NormalizationAxes = [1]
-NormalizationFieldExemptions = ['actionID-0', 'actionID-1', 'actionID-2', 'actionID-3']
+NormalizationFieldExemptions = []
 LayerDensities = range(25, 50, 25)
 HiddenLayerCounts = range(1, 4)
 LayerActivations = [
@@ -207,7 +205,6 @@ def SetupAndRunModels(traininputs, traintargets, testinputs, testtargets, normal
                                 accuResults = None
                                 results = None
                                 model = None
-
 
 
 for normalizationApproach in Normalizations:

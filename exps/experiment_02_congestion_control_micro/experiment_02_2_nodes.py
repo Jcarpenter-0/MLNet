@@ -13,15 +13,14 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 import networks.mahimahi
 import networks.common
-import experiments.common
 
 # Experiment Parameters
 TraceDir = './mahimahi-traces/'
 TrainPercentage = 0.80
 TestPercentage = 1 - TrainPercentage
-TestRepetitions = 10
+TestRepetitions = 2
 VerificationPatternFiles = ['./bbr-pattern.csv', './cubic-pattern.csv', './reno-pattern.csv', './vegas-pattern.csv']
-ExperimentRunTime = 1800
+ExperimentRunTime = 1900
 IperfRunCount = 1000
 IperfRunLength = 10
 
@@ -62,7 +61,7 @@ input("Press Enter to continue... or ctrl-c to stop")
 for trnEnv in TrainingTopologies:
 
     # Setup the learners
-    ccLearner = experiments.common.Learner(
+    ccLearner = exps.Learner(
         '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
         , traceFilePostFix=trnEnv.GetParaString() + '_trn')
 
@@ -79,14 +78,14 @@ for trnEnv in TrainingTopologies:
     iperfServerNode.AddApplication(['iperf3', '-s'])
 
     # run experiment
-    experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner], ExperimentRunTime)
+    exps.runExperimentUsingFramework([iperfServerNode, iperfClientNode], [ccLearner], ExperimentRunTime, learnerServerCooldown=30)
 
 # Test
 for tstEnv in TestingTopologies:
 
     for testRep in range(0, TestRepetitions):
         # Setup the learners
-        ccLearner = experiments.common.Learner(
+        ccLearner = exps.Learner(
             '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
             , training=0
             , traceFilePostFix=tstEnv.GetParaString() + '_tst_{}'.format(testRep))
@@ -104,8 +103,8 @@ for tstEnv in TestingTopologies:
         iperfServerNode.AddApplication(['iperf3', '-s'])
 
         # run experiment
-        experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner],
-                                                       ExperimentRunTime)
+        exps.runExperimentUsingFramework([iperfServerNode, iperfClientNode], [ccLearner],
+                                                ExperimentRunTime, learnerServerCooldown=30)
 
 # Verify
 for tstEnv in TestingTopologies:
@@ -114,7 +113,7 @@ for tstEnv in TestingTopologies:
 
         for verPattern in VerificationPatternFiles:
             # Setup the learners
-            ccLearner = experiments.common.Learner(
+            ccLearner = exps.Learner(
                 '{}learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
                 , training=2
                 , traceFilePostFix=tstEnv.GetParaString() + '_{}_{}'.format(testRep, verPattern.replace('.','').replace('/',''))
@@ -134,7 +133,7 @@ for tstEnv in TestingTopologies:
             iperfServerNode.AddApplication(['iperf3', '-s'])
 
             # run experiment
-            experiments.common.runExperimentUsingFramework([iperfClientNode, iperfServerNode], [ccLearner],
-                                                           ExperimentRunTime)
+            exps.runExperimentUsingFramework([iperfServerNode, iperfClientNode], [ccLearner],
+                                                    ExperimentRunTime, learnerServerCooldown=30)
 
 print('Experiment Done')

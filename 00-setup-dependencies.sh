@@ -12,12 +12,12 @@ sudo apt install python3-pip
 pip3 install --upgrade pip3
 
 # Install tensorflow
-pip3 install tensorflow
+pip3 install --upgrade tensorflow
 # install older tensorflow, due to older cpu's lacking AVX support
 # ==1.5
 
 # Install keras
-pip3 install keras
+pip3 install --upgrade keras
 # older version ==2.1.5
 # sudo pip install [package_name] --upgrade
 # sudo pip uninstall [package_name]
@@ -26,7 +26,7 @@ pip3 install keras
 #more /proc/cpuinfo | grep flags
 
 # Install sklearn
-pip3 install sklearn
+pip3 install --upgrade sklearn
 
 # Install pandas
 pip3 install pandas

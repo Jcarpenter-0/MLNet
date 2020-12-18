@@ -5,11 +5,68 @@ import http.server
 import datetime
 from typing import Tuple
 import signal
+import mdp
+
+class Learner(object):
+
+    def __init__(self, learnerScriptPath
+                 , learnerDir='./tmp/'
+                 , learnerPort=8080
+                 , learnerAddress=None
+                 , training=1
+                 , traceFilePostFix=''
+                 , miscArgs=[]):
+        """The abstraction of a 'learner' comprised of a ml module, problem definition,
+         and a server to host on. Intended to call a learner's setup script in /learners/ and pass some args."""
+        self.LearnerScriptPath = learnerScriptPath
+        self.LearnerPort = learnerPort
+        self.LearnerAddress = learnerAddress
+        if self.LearnerAddress is None:
+            self.LearnerAddress = ''
+
+        self.LearnerDir = learnerDir
+        self.Training = training
+
+        self.BaseCommand = ['python3', '{}'.format(self.LearnerScriptPath)]
+
+        self.TraceFilePostFix = traceFilePostFix
+        self.MiscArgs = miscArgs
+
+    def ToArgs(self, shell=False):
+        """
+        :return: a list of cmd line args for use in Popen or cmd
+        """
+
+        if shell:
+            # return as a string
+            return '{} {} {} {} {}'.format(
+                self.BaseCommand[0]
+                , self.BaseCommand[1]
+                , self.LearnerPort
+                , self.LearnerAddress
+                , self.Training
+                , self.LearnerDir)
+        else:
+            # return as a python list
+
+            commandArgs = self.BaseCommand.copy()
+
+            commandArgs.extend([
+                '{}'.format(self.LearnerPort)
+                , self.LearnerAddress
+                , '{}'.format(self.Training)
+                , self.LearnerDir
+                , self.TraceFilePostFix])
+
+            commandArgs.extend(self.MiscArgs)
+
+            return commandArgs
+
 
 # Helper functions
 
 def DefineSpanningActionSpace(actionFields:dict):
-    # List to hold what action para is to be used, will be n entries where n is number of action paras
+    """List to hold what action para is to be used, will be n entries where n is number of action paras"""
     actionIndices = []
 
     for actionFieldNum in range(0, len(actionFields)):
@@ -20,8 +77,6 @@ def DefineSpanningActionSpace(actionFields:dict):
 
     for inputField in actionFields.keys():
         inputFieldValues = actionFields[inputField]
-        print('Input Field {} - {}'.format(inputField, len(inputFieldValues)))
-
         numberOfPossibleActions = numberOfPossibleActions * len(inputFieldValues)
 
     # action para patterns
@@ -32,27 +87,28 @@ def DefineSpanningActionSpace(actionFields:dict):
 
         inputPatternDict = dict()
 
-        # for every action and value of actions
+
+        # For each input field, and range of inputs for that field
         for index, actionField in enumerate(actionFields.keys()):
             actionFieldInputRange = actionFields[actionField]
-
             inputPlace = actionIndices[index]
-
-            # check for wraparound
-            if inputPlace != 0 and inputPlace % len(actionFieldInputRange) == 0:
-                actionIndices[index] = 0
-                inputPlace = 0
-
-                # increase the previous input's place as well
-                if index != 0:
-                    actionIndices[index - 1] += 1
 
             inputPatternDict[actionField] = actionFieldInputRange[inputPlace]
 
-            # increment the action indices
-            actionIndices[index] += 1
+            # Increment to the next input parameter
+            inputPlace += 1
+
+            # check for wraparound, if so reset input place
+            if inputPlace >= len(actionFieldInputRange):
+
+                actionIndices[index] = 0
+                inputPlace = 0
+
+            actionIndices[index] = inputPlace
 
         inputPatterns.append(inputPatternDict)
+
+    #print('{}'.format(inputPatterns))
 
     return inputPatterns
 
@@ -66,9 +122,14 @@ class SessionReport(object):
         self.SessionDuration = 0
 
 
-class DomainDefinition(object):
+class DomainModule(object):
 
-    def __init__(self, loggingDirPath, traceFilePostFix='', observationFields=[], actions:dict=dict()):
+    def __init__(self
+                 , loggingDirPath
+                 , traceFilePostFix=''
+                 , observationFields=[]
+                 , actions:dict=dict()
+                 , actionSpace:list=None):
         """The Domain translation space.
         Set the translations of state and action and the define the reward.
         Inherit this to define a problem for a learner.
@@ -81,33 +142,44 @@ class DomainDefinition(object):
         # Logging and Trace Info
         self.SessionStart = datetime.datetime.now()
         self.CoreDir = loggingDirPath
+        self.DomainConfigFilePath = loggingDirPath + 'domainconf.json'
         self.ReportFilePath = loggingDirPath + 'session-reports.json'
-        self.LogFilePath = loggingDirPath + '{}-{}-session-log.csv'.format(self.SessionStart.strftime(self.DateFormat), traceFilePostFix)
+        self.LogFileDir = loggingDirPath + 'Traces/'
+        self.LogFileName = '{}-{}-session-log.csv'.format(self.SessionStart.strftime(self.DateFormat), traceFilePostFix)
 
         # Ensure the existence of paths
         os.makedirs(self.CoreDir, exist_ok=True)
+        os.makedirs(self.LogFileDir, exist_ok=True)
 
         # Setup the Trace File pointers
-        self.LogFileFP = open(self.LogFilePath, 'w')
+        self.LogFileFP = open(self.LogFileDir + self.LogFileName, 'w')
+        self.FirstLogWrite = True
 
-        # Write the Trace File header
-        self.TraceFields = ['Timestamp', 'Reward']
-        self.TraceFields.extend(observationFields)
-        self.ObservationFields = observationFields
+        # define initial total actionSpace
         self.ActionFields = actions
+        if actionSpace is None:
+            self.ActionSpace = DefineSpanningActionSpace(self.ActionFields)
+        else:
+            self.ActionSpace = actionSpace
 
-        headerStr = ''
-
-        for idx, field in enumerate(self.TraceFields):
-            headerStr += field
-            if idx < len(self.TraceFields):
-                headerStr += ','
-
-        self.LogFileFP.write('{}\n'.format(headerStr))
-        self.LogFileFP.flush()
+        self.ObservationFields = observationFields
 
         # Session meta info
-        self.SessionReport = SessionReport()
+        #self.SessionReport = SessionReport()
+
+        # Write out the info file
+        domainConf = dict()
+
+        domainConf['ActionSpaceSize'] = len(self.ActionSpace)
+        domainConf['Actions'] = self.ActionFields
+        domainConf['ObservationMetrics'] = self.ObservationFields
+
+        domainConfFP = open(self.DomainConfigFilePath, 'w')
+
+        json.dump(domainConf, domainConfFP, skipkeys=True, indent=8)
+
+        domainConfFP.flush()
+        domainConfFP.close()
 
     def Describe(self):
         """For human reading"""
@@ -119,9 +191,9 @@ class DomainDefinition(object):
 
         return descDict
 
-    def DefineActionSpace(self):
+    def DefineActionSpaceSubset(self):
         """Define the valid range of possible actions as a list of dicts for each valid input pattern."""
-        return DefineSpanningActionSpace(self.ActionFields)
+        return None
 
     def DefineReward(self, observation):
         """Define the reward for an observation"""
@@ -140,22 +212,44 @@ class DomainDefinition(object):
         else:
             return observation
 
-    def RecordObservation(self, observation, reward=None):
+    def RecordObservation(self, observation, reward=None, rawObservation=None):
         """Will simply log the incoming observation to a csv file."""
 
-        logLine = ''
+        obvLog = dict()
 
         # Add timestamp to the observation
-        observation['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
+        obvLog['Timestamp'] = datetime.datetime.now().strftime(self.DateFormat)
 
         # Add reward, if possible
         if reward is not None:
-            observation['Reward'] = reward
+            obvLog['Reward'] = reward
 
-        for index, field in enumerate(self.TraceFields):
-            logLine += '{}'.format(observation[field])
+        obvLog.update(observation.copy())
 
-            if index < len(self.TraceFields):
+        if rawObservation is not None:
+            for rawField in rawObservation:
+                obvLog['Raw-{}'.format(rawField)] = rawObservation[rawField]
+
+        if self.FirstLogWrite:
+            # Write out the header
+            self.FirstLogWrite = False
+
+            headerLine = ''
+
+            for index, field in enumerate(obvLog.keys()):
+                headerLine += '{}'.format(field)
+
+                if index < len(obvLog) - 1:
+                    headerLine += ','
+
+            self.LogFileFP.write(headerLine + '\n')
+
+        logLine = ''
+
+        for index, field in enumerate(obvLog.keys()):
+            logLine += '{}'.format(obvLog[field])
+
+            if index < len(obvLog) - 1:
                 logLine += ','
 
         self.LogFileFP.write(logLine + '\n')
@@ -175,14 +269,52 @@ class DomainDefinition(object):
     def CallOrder(self, observation):
         """Order to call the methods in when an observation comes in"""
 
-        reward = self.DefineReward(observation)
-
-        if self.LogFilePath is not None:
-            self.RecordObservation(observation, reward)
-
         filteredObservation = self.DefineObservation(observation)
 
+        reward = self.DefineReward(filteredObservation)
+
+        if self.LogFileFP is not None:
+
+            self.RecordObservation(filteredObservation, reward, observation)
+
         return filteredObservation, reward, observation
+
+
+class MDPModule(DomainModule):
+
+    def __init__(self, loggingDirPath, mdp:list):
+        super().__init__(loggingDirPath)
+        self.MDP = mdp
+        self.IncomingMetrics = None
+
+    def DefineActionSpaceSubset(self):
+        """Action space is defined by what state the system is currently in"""
+
+        # Get current State
+        currentState, _ = mdp.AnalyzeObservation(self.IncomingMetrics, self.MDP)
+
+        return currentState.Actions.copy()
+
+    def DefineObservation(self, observation):
+        """Observation is provided by the MDP that defines the states"""
+        self.IncomingMetrics = observation.copy
+
+        # Get current State based on metrics
+        currentState, id = mdp.AnalyzeObservation(observation, self.MDP)
+
+        # Add to the observation, state id
+        newObv = observation.copy
+
+        newObv['StateID'] = id
+
+        newObv = currentState.AdjustMetrics(newObv)
+
+        return newObv
+
+    def DefineReward(self, observation):
+        return NotImplementedError
+
+
 
 # Basic ML Modules
 
@@ -193,7 +325,7 @@ class MLModule(object):
         """Essentially a callback class, implement your ML logic and then place the 'step loop' in Operate()"""
         return
 
-    def Operate(self, observation, reward, actionSpace, info, domainDefinition:DomainDefinition):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:DomainModule):
         """Return a dict of action decisions"""
         return NotImplementedError
 
@@ -212,7 +344,7 @@ class PatternModule(MLModule):
         self.Pattern = pattern
         self.PatternIndex = 0
 
-    def Operate(self, observation, reward, actionSpace, info, domainDefinition):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition):
 
         returnDict = self.Pattern[self.PatternIndex]
         self.PatternIndex += 1
@@ -220,6 +352,8 @@ class PatternModule(MLModule):
         # Handle pattern wrap around
         if self.PatternIndex == len(self.Pattern):
             self.PatternIndex = 0
+
+        print('Pattern Module - Next Action - {}'.format(returnDict))
 
         return returnDict
 
@@ -268,9 +402,9 @@ class MLHttpHandler(http.server.SimpleHTTPRequestHandler):
         # Process the info through the domain definition
         filteredObv, reward, obv = self.server.DomainDefinition.CallOrder(observation)
 
-        actionSpace = self.server.DomainDefinition.DefineActionSpace()
+        actionSpaceSubset = self.server.DomainDefinition.DefineActionSpaceSubset()
 
-        returnCommandsDict = self.server.MLModule.Operate(filteredObv, reward, actionSpace, obv, self.server.DomainDefinition)
+        returnCommandsDict = self.server.MLModule.Operate(filteredObv, reward, self.server.DomainDefinition.ActionSpace, actionSpaceSubset, obv, self.server.DomainDefinition)
 
         # Convert commands to Json
         returnCommandsJson = json.dumps(returnCommandsDict, indent=5)
@@ -285,7 +419,7 @@ class MLHttpHandler(http.server.SimpleHTTPRequestHandler):
 
 class MLServer(http.server.HTTPServer):
 
-    def __init__(self, domainDefinition: DomainDefinition, mlModule, server_address: Tuple[str, int]):
+    def __init__(self, domainDefinition: DomainModule, mlModule, server_address: Tuple[str, int]):
         """ML HTTP Server, will stand as endpoint to receive observations
         from environment and send out actions as response to requests."""
         super().__init__(server_address, MLHttpHandler)
@@ -316,7 +450,7 @@ if __name__ == '__main__':
     mlModule = PatternModule(pattern=[{'act':1 ,'act2':0}])
 
     # Define the domain knowledge
-    domainDef = DomainDefinition('', '')
+    domainDef = DomainModule('', '')
 
     # Declare a server
     server = MLServer(domainDef, mlModule, ('', 8080))

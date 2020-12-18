@@ -2,6 +2,7 @@
 Included Learners (Note: these are just for proof of concept and some experimentation)
 """
 
+import sys
 import random
 import json
 import os
@@ -39,6 +40,7 @@ class KerasEnsemblePredictive(learners.common.MLModule):
         self.ConfigDescFilePath = self.CoreDir + 'learner-config.json'
 
         # ML info
+        self.Step = 0
         self.TargetFields = targetFields
         self.ObservationFields = observationFields
         self.Training = training
@@ -95,7 +97,7 @@ class KerasEnsemblePredictive(learners.common.MLModule):
 
                 print('New {} created'.format(modelName))
 
-    def Operate(self, observation, reward, actionSpace, info, domainDefinition):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition):
 
         # Run each model
         explore = False
@@ -153,7 +155,7 @@ class KerasEnsemblePredictive(learners.common.MLModule):
         else:
             # Do a "considered" action
             # Look at all the possible actions
-            highestRewardValue = -1
+            highestRewardValue = -1 * sys.maxsize
             highestRewardIndex = -1
 
             for inputIndex, inputPattern in enumerate(actionSpace):
@@ -193,6 +195,8 @@ class KerasEnsemblePredictive(learners.common.MLModule):
 
                     testing_x_array = list(test_x.values())
 
+                    print('Prediction input {}'.format(testing_x_array))
+
                     predictedValue = model.predict([testing_x_array])[0][0]
 
                     # box the predicted value so that it fits into pandas dataframe
@@ -201,15 +205,17 @@ class KerasEnsemblePredictive(learners.common.MLModule):
                 # calculate the reward
                 rewardCalculatedFromPrediction = domainDefinition.DefineReward(potentialObv)
 
+                print('Input {} - Prediction - {} : {}'.format(str(inputPattern), str(potentialObv), rewardCalculatedFromPrediction))
+
                 if rewardCalculatedFromPrediction > highestRewardValue:
                     highestRewardIndex = inputIndex
                     highestRewardValue = rewardCalculatedFromPrediction
 
             action = actionSpace[highestRewardIndex]
 
-        print('Action Space {}'.format(len(actionSpace)))
+        print('Step {} - ML Action: {} - Possible Action Space {}'.format(self.Step, str(action), len(actionSpace)))
 
-        print('ML Action: {}'.format(str(action)))
+        self.Step += 1
 
         return action
 
@@ -228,7 +234,7 @@ if __name__ == '__main__':
     # For testing the models
 
     # Setup domain definition
-    domainDF = learners.example_ping_manager.ping_manager.PingExperimentExampleDomainDefinition('./tmp/')
+    domainDF = learners.example_ping_manager.ping_manager.PingExperimentExampleDomainModule('./tmp/')
 
     # Setup the ML module
     obvFields = domainDF.ObservationFields
@@ -239,7 +245,7 @@ if __name__ == '__main__':
 
     testModel.Operate({'-c': 10, '-s': 56, '-t': 255, 'packetLoss': 0.0, 'rttAvg': 20.594}
                       , 10
-                      , domainDF.DefineActionSpace()
+                      , domainDF.DefineActionSpaceSubset()
                       , None
                       , domainDF)
 

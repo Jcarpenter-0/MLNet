@@ -9,7 +9,7 @@ from scipy.stats import spearmanr
 # https://en.wikipedia.org/wiki/Document-term_matrix
 
 # Input Variables
-INPUTFILEPATH = '../../experiments/experiment_02_congestion_control_micro/tmp/cclearner/traces/09-07-2020-02-11-05-training-runlogs.csv'
+INPUTFILEPATH = '../../exps/experiment_02_congestion_control_micro/tmp/cclearner/traces/09-07-2020-02-11-05-training-runlogs.csv'
 INPUTFILENAME = INPUTFILEPATH.split('/')[-1]
 
 macroDF = pd.read_csv(INPUTFILEPATH)

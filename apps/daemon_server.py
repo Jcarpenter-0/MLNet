@@ -3,8 +3,9 @@ import http.server
 import time
 import json
 import sys
+import os
 
-# Server for running/stopping/checking on applications running on hosts started by this server
+# Server for running/stopping/checking on apps running on hosts started by this server
 # Get will advertise the testing application's status, running, time running, application executing, etc
 
 global ApplicationProcs
@@ -31,7 +32,7 @@ def PrepareServerArgs(dirOffset='./', opServerPort=8081):
             Returns:
                     argList (list): List of args for use in Popen()
     '''
-    return ['python3', '{}applications/daemon_server.py'.format(dirOffset), '{}'.format(opServerPort)]
+    return ['python3', '{}apps/daemon_server.py'.format(dirOffset), '{}'.format(opServerPort)]
 
 
 class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
@@ -61,6 +62,7 @@ class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
         dataDict = dict()
 
         dataDict.update(CommandDescriptions)
+        dataDict['CWD'] = os.getcwd()
 
         for index, proc in enumerate(ApplicationProcs):
             procName = proc.args
@@ -188,7 +190,7 @@ if __name__ == '__main__':
     daemonServer = DaemonServer(address, port)
 
     # 0.0.0.0 means listen on any address, stating localhost breaks it for external connections
-    print('Server up http://0.0.0.0:{}/'.format(port))
+    print('App Server: http://0.0.0.0:{}/ {}'.format(port, os.getcwd()))
 
     try:
         daemonServer.run()
