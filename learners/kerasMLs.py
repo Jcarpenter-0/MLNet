@@ -81,7 +81,7 @@ class kerasActorCritic(learners.common.MLModule):
             # Sample action from action probability distribution
             action = np.random.choice(self.num_actions, p=np.squeeze(action_probs))
 
-            print('State {} - {} - Action {}'.format(state, np.squeeze(action_probs), action))
+            print('State {} - ActionSpace {} - Action {}'.format(state, np.squeeze(action_probs), action))
 
             self.action_probs_history.append(tf.math.log(action_probs[0, action]))
 

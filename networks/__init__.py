@@ -3,6 +3,7 @@ import subprocess
 import requests
 import time
 import json
+import netifaces
 
 
 class NetworkModule(object):
@@ -74,7 +75,7 @@ class Node(object):
         self.DaemonPort = daemonPort
         self.Applications = []
 
-    def AddApplication(self, appArgs):
+    def AddApplication(self, appArgs:list):
         self.Applications.append(appArgs)
 
     def StartApplications(self, interApplicationDelay=0):
@@ -95,6 +96,7 @@ class Node(object):
 
                 response = requests.post('http://{}:{}/processStart/'.format(self.IpAddress, self.DaemonPort),
                                          data=jsonBody)
+
                 if response.ok is False:
                     raise Exception("Problem raising process on node {} : {}".format(self.IpAddress, response.text))
 
@@ -134,7 +136,7 @@ class Node(object):
                 if response.ok is False:
                     raise Exception('Could not stop process on node')
             else:
-                print('Node: No daemon server to stop processes, must implement new logic to cease sub processes')
+                print('Node {}: No daemon server to stop processes, must implement new logic to cease sub processes'.format(self.IpAddress))
 
         except Exception as ex:
             print(ex)
@@ -152,12 +154,12 @@ class Node(object):
                 self.NodeProc.kill()
                 self.NodeProc.wait()
 
-            print(self.IpAddress + ' shutdown')
+            print('{} shutdown'.format(self.IpAddress))
         else:
-            print(self.IpAddress + ' has no proc, but is called to shutdown')
+            print('{} has no proc, but is called to shutdown'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./'):
+def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', interfaceIPSource:str='lo'):
 
     # run daemon server
     opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
@@ -168,4 +170,8 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./'):
     stderr=subprocess.STDOUT,
     universal_newlines=True)
 
-    return Node(ipAddress='127.0.0.1', daemonPort=daemonServerPort, nodeProc=opProc)
+    ipAddress = netifaces.ifaddresses(interfaceIPSource)[netifaces.AF_INET][0]['addr']
+
+    print('Localhost node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
+
+    return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc)

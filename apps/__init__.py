@@ -63,6 +63,8 @@ def ParseDefaultArgs():
 
     appArgs = sys.argv[1:-2]
 
+    print("App Args {}".format(appArgs))
+
     # convert appArgs to a arg dict
     argDict = dict()
 

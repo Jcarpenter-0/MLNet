@@ -3,6 +3,18 @@ import networks
 import apps.daemon_server
 
 
+def MakeMahiMahiLinkFile(bandwidth:int) -> list:
+    """Make a mahimahi link file for use in the mm-link shell. This code is almost verbatim taken from the Park project by MIT."""
+
+    linkLines = []
+
+    lines = bandwidth // 12
+    for _ in range(lines):
+        linkLines.append('1\n')
+
+    return linkLines
+
+
 class MahiMahiShell():
 
     def __init__(self):
@@ -59,11 +71,25 @@ class MahiMahiLossShell(MahiMahiShell):
 
 class MahiMahiLinkShell(MahiMahiShell):
 
-    def __init__(self, upLinkLogFilePath, downLinkLogFilePath):
+    def __init__(self, upLinkLogFilePath, downLinkLogFilePath, uplinkQueue:str=None, uplinkQueueArgs:str=None, downlinkQueue:str=None, downlinkQueueArgs:str=None):
         super().__init__()
         self.Command = 'mm-link'
         self.Args.append(upLinkLogFilePath)
         self.Args.append(downLinkLogFilePath)
+
+        if uplinkQueue is not None:
+            self.Args.append('--uplink-queue={}'.format(uplinkQueue))
+
+            if uplinkQueueArgs is not None:
+                self.Args.append('--uplink-queue-args=\"{}\"'.format(uplinkQueueArgs))
+
+        if downlinkQueue is not None:
+            self.Args.append('--downlink-queue={}'.format(downlinkQueue))
+
+            if downlinkQueueArgs is not None:
+                self.Args.append('--downlink-queue-args=\"{}\"'.format(uplinkQueueArgs))
+
+
 
     def GetParaString(self):
         paraString = super(MahiMahiLinkShell, self).GetParaString()
@@ -75,7 +101,7 @@ class MahiMahiLinkShell(MahiMahiShell):
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./') -> networks.Node:
+def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./../') -> networks.Node:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
@@ -117,7 +143,7 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
                               stderr=subprocess.STDOUT,
                               universal_newlines=True)
 
-    print('MM Node {} {} {}'.format(ipAddress, daemonPort, mmProc.returncode))
+    print('MM Node http://{}:{}/ - {}'.format(ipAddress, daemonPort, mmProc.returncode))
 
     return networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort)
 
@@ -125,10 +151,25 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
 def SetupMahiMahiNetwork(setupArgs:dict) -> networks.NetworkModule:
     """Autobuilder method for creating a mahi mahi network"""
 
+    shellList = []
 
+    if 'link delay' in setupArgs.keys():
+        shellList.append(MahiMahiDelayShell(setupArgs['link delay']))
 
+    if 'uplink loss' in setupArgs.keys():
+        shellList.append(MahiMahiLossShell(setupArgs['uplink loss']))
 
-    return None
+    if 'downlink loss' in setupArgs.keys():
+        shellList.append(MahiMahiLossShell(setupArgs['downlink loss'], 'downlink'))
+
+    if 'uplink trace' in setupArgs.keys() and 'downlink trace' in setupArgs.keys():
+        shellList.append(MahiMahiLinkShell(setupArgs['uplink trace'], setupArgs['downlink trace']))
+
+    node = SetupMahiMahiNode(shellList)
+
+    mmModule = networks.NetworkModule(nodes=[node])
+
+    return mmModule
 
 
 class MahiMahiNetworkDefinition(networks.__networkDefinition):

@@ -190,7 +190,7 @@ if __name__ == '__main__':
     daemonServer = DaemonServer(address, port)
 
     # 0.0.0.0 means listen on any address, stating localhost breaks it for external connections
-    print('App Server: http://0.0.0.0:{}/ {}'.format(port, os.getcwd()))
+    print('App Server: http://{}:{}/ {}'.format(address, port, os.getcwd()))
 
     try:
         daemonServer.run()

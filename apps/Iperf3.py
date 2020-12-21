@@ -1,4 +1,6 @@
 import numpy as np
+import math
+import numpy as np
 import subprocess
 
 # Setup the dir
@@ -44,6 +46,13 @@ def DefineMetrics() -> dict:
     metricDict['receiver-seconds'] = float
     metricDict['receiver-bytes'] = float
     metricDict['receiver-bps'] = float
+
+    metricDict['maxRTT'] = float
+    metricDict['minRTT'] = float
+    metricDict['meanRTT'] = float
+    metricDict['max_snd_cwnd'] = float
+    metricDict['avg_snd_cwnd'] = float
+    metricDict['min_snd_cwnd'] = float
 
     return metricDict
 
@@ -121,6 +130,38 @@ def ParseOutput(rawData:bytes) -> dict:
     dataDict['receiver-seconds'] = recSection['seconds']
     dataDict['receiver-bytes'] = recSection['bytes']
     dataDict['receiver-bps'] = recSection['bits_per_second']
+
+    # Stream dissection
+    streamSection = endSection['streams']
+
+    minRTTs = []
+    maxRTTs = []
+    avgRTTs = []
+
+    maxSendCWNDs = []
+
+    for stream in streamSection:
+        streamSender = stream['sender']
+
+        snd = int(streamSender['max_snd_cwnd'])
+        maxSendCWNDs.append(snd)
+
+        maxRTT = float(streamSender['max_rtt'])
+        maxRTTs.append(maxRTT)
+
+        minRTT = float(streamSender['min_rtt'])
+        minRTTs.append(minRTT)
+
+        meanRTT = float(streamSender['mean_rtt'])
+        avgRTTs.append(meanRTT)
+
+    # Calculate macros
+    dataDict['maxRTT'] = np.max(minRTTs)
+    dataDict['minRTT'] = np.min(minRTTs)
+    dataDict['meanRTT'] = np.mean(avgRTTs)
+    dataDict['max_snd_cwnd'] = np.max(maxSendCWNDs)
+    dataDict['avg_snd_cwnd'] = np.mean(maxSendCWNDs)
+    dataDict['min_snd_cwnd'] = np.min(maxSendCWNDs)
 
     return dataDict
 

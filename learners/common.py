@@ -7,6 +7,7 @@ from typing import Tuple
 import signal
 import mdp
 
+
 class Learner(object):
 
     def __init__(self, learnerScriptPath
@@ -31,6 +32,9 @@ class Learner(object):
 
         self.TraceFilePostFix = traceFilePostFix
         self.MiscArgs = miscArgs
+
+    def GetURL(self) -> str:
+        return 'http://{}:{}/'.format(self.LearnerAddress, self.LearnerPort)
 
     def ToArgs(self, shell=False):
         """
@@ -228,7 +232,8 @@ class DomainModule(object):
 
         if rawObservation is not None:
             for rawField in rawObservation:
-                obvLog['Raw-{}'.format(rawField)] = rawObservation[rawField]
+
+                obvLog['Raw-{}'.format(rawField)] = "\"{}\"".format(rawObservation[rawField])
 
         if self.FirstLogWrite:
             # Write out the header
@@ -454,7 +459,7 @@ if __name__ == '__main__':
 
     # Declare a server
     server = MLServer(domainDef, mlModule, ('', 8080))
-    print('Server up at http://localhost:{}'.format(8080))
+    print('Learner: http://localhost:{}'.format(8080))
     server.serve_forever()
 
     print()

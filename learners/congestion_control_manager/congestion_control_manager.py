@@ -2,43 +2,60 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, '../../')
+
+import math
+
 import learners.common
 import learners.preBuiltLearners
+import learners.kerasMLs
 
 
 class CongestionControlExperimentProblemModule(learners.common.DomainModule):
 
     def __init__(self, loggingDirPath, traceFilePostFix=''):
+
+        actionSpace = []
+
+        actionSpace.append({'-C': 'cubic'})
+        actionSpace.append({'-C': 'bbr'})
+        actionSpace.append({'-C': 'vegas'})
+        actionSpace.append({'-C': 'reno'})
+
         super().__init__(loggingDirPath
                          , traceFilePostFix=traceFilePostFix
                          , observationFields=[
-                'bps-0'
-            , 'retransmits-0'
-            , 'cubic'
-            , 'bbr'
-            , 'vegas'
-            , 'reno'
-            , 'bps-1'
-            , 'retransmits-1']
+                                    'receiver-bps'
+                                , 'sender-retransmits'
+                                , 'num_streams'
+                                , 'timesecs'
+                                , 'blksize'
+                                , 'duration'
+                                , 'tcp_mss_default'
+                                , 'maxRTT'
+                                , 'minRTT'
+                                , 'meanRTT'
+                                , 'max_snd_cwnd'
+                                , 'avg_snd_cwnd'
+                                , 'min_snd_cwnd'
+                                ]
                          , actions={
-                'cubic': range(0, 2),
-                'bbr': range(0, 2),
-                'vegas': range(0, 2),
-                'reno': range(0, 2)})
+                                'cubic': [0,1],
+                                'bbr': [0,1],
+                                'vegas': [0,1],
+                                'reno': [0,1]}
+                         , actionSpace=actionSpace)
 
-    def DefineActionSpaceSubset(self):
-
-        actions = []
-
-        actions.append({'cubic': 1, 'bbr': 0, 'vegas': 0, 'reno': 0})
-        actions.append({'cubic': 0, 'bbr': 1, 'vegas': 0, 'reno': 0})
-        actions.append({'cubic': 0, 'bbr': 0, 'vegas': 1, 'reno': 0})
-        actions.append({'cubic': 0, 'bbr': 0, 'vegas': 0, 'reno': 1})
-
-        return actions
 
     def DefineReward(self, observation):
-        return float(observation["bps-1"]) * 2 - float(observation["retransmits-1"]) * 1
+        # Copa style reward = log(throughput) - log(delay)/2 - log(lost packets)
+
+        throughput = float(observation['receiver-bps'])
+        delay = float(observation['meanRTT']) - float(observation['minRTT'])
+        lostPackets = float(observation['sender-retransmits'])
+
+        reward = math.log2(throughput) - (math.log2(delay)/2) - math.log2(lostPackets)
+
+        return reward
 
 
 if __name__ == '__main__':
@@ -47,18 +64,13 @@ if __name__ == '__main__':
     port, address, mode, learnerDir, filePostFix, miscArgs = learners.common.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = CongestionControlExperimentProblemModule(learnerDir + 'Traces/', traceFilePostFix=filePostFix)
-
-    # Setup the ML module
-    obvFields = domainDF.ObservationFields
+    domainDF = CongestionControlExperimentProblemModule(learnerDir + 'learner/', traceFilePostFix=filePostFix)
 
     # Depending on mode
     if mode == 1 or mode == 0:
         # training/testing
-        mlModule = learners.preBuiltLearners.KerasEnsemblePredictive(learnerDir
-                                                                 , ['bps-1','retransmits-1']
-                                                                 , obvFields
-                                                                 , training=mode == 1)
+        mlModule = learners.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.ObservationFields), len(domainDF.ActionSpace))
+
     else:
         # pattern mode, for verification
 
@@ -88,9 +100,6 @@ if __name__ == '__main__':
 
     # Declare a server
     server = learners.common.MLServer(domainDF, mlModule, (address, port))
-
-    # Start the server
-    print('Server up at http://localhost:{}'.format(port))
 
     try:
         server.serve_forever()
