@@ -157,8 +157,8 @@ def ParseOutput(rawData:bytes) -> dict:
         avgRTTs.append(meanRTT)
 
     # Calculate macros
-    dataDict['maxRTT'] = float(np.mean(maxRTTs))
-    dataDict['minRTT'] = float(np.mean(minRTTs))
+    dataDict['maxRTT'] = float(np.max(minRTTs))
+    dataDict['minRTT'] = float(np.min(minRTTs))
     dataDict['meanRTT'] = float(np.mean(avgRTTs))
     dataDict['max_snd_cwnd'] = float(np.max(maxSendCWNDs))
     dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
@@ -171,12 +171,13 @@ def __runIperf3(args:dict) -> dict:
 
     cmdArgs = apps.ToPopenArgs(args)
 
-    command = ['iperf3']
+    command = ['iperf']
     command.extend(cmdArgs)
 
     # Quiet the output for easier parsing
-    if '-J' not in command:
-        command.append('-J')
+    if '-y' not in command:
+        command.append('-y')
+        command.append('-c')
 
     outputRaw = subprocess.check_output(command)
 

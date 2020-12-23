@@ -5,6 +5,7 @@ import http.server
 import datetime
 from typing import Tuple
 import signal
+import time
 import mdp
 
 
@@ -376,7 +377,7 @@ def ParseDefaultServerArgs():
     if len(sys.argv) >= 6:
         miscArgs = sys.argv[6:]
 
-    print('Server args: {} {} {} {} {}'.format(port, learnerAddress, mode, learnerDir, traceFilePostFix))
+    print('Server args: {} {} {} {} {} {}'.format(port, learnerAddress, mode, learnerDir, traceFilePostFix, miscArgs))
 
     return port, learnerAddress, mode, learnerDir, traceFilePostFix, miscArgs
 
@@ -460,6 +461,13 @@ if __name__ == '__main__':
     # Declare a server
     server = MLServer(domainDef, mlModule, ('', 8080))
     print('Learner: http://localhost:{}'.format(8080))
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except Exception as ex:
+        print(ex)
+        errorFP = open('learner-error-{}.txt'.format(time.time()), 'w')
 
-    print()
+        errorFP.write('{}'.format(ex))
+
+        errorFP.flush()
+        errorFP.close()

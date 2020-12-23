@@ -53,7 +53,16 @@ class CongestionControlExperimentProblemModule(learners.common.DomainModule):
         delay = float(observation['meanRTT']) - float(observation['minRTT'])
         lostPackets = float(observation['sender-retransmits'])
 
-        reward = math.log2(throughput) - (math.log2(delay)/2) - math.log2(lostPackets)
+        reward = 0
+
+        if throughput > 0:
+            reward = math.log2(throughput)
+
+        if delay > 0:
+            reward = reward - (math.log2(delay) * 0.5)
+
+        if lostPackets > 0:
+            reward = reward - math.log2(lostPackets)
 
         return reward
 
@@ -75,26 +84,7 @@ if __name__ == '__main__':
         # pattern mode, for verification
 
         # pattern
-        patternPath = miscArgs[0]
-
-        patternFP = open(patternPath, 'r')
-        patternLines = patternFP.readlines()
-
-        # Load the header
-        patternHeader = patternLines[0].split(',')
-
-        pattern = list()
-
-        for line in patternLines[1:]:
-
-            lineDict = dict()
-
-            linePieces = line.split(',')
-
-            for col in patternHeader:
-                lineDict[col] = linePieces
-
-            pattern.append(lineDict)
+        pattern = learners.loadPatternFile(miscArgs[0])
 
         mlModule = learners.common.PatternModule(pattern)
 

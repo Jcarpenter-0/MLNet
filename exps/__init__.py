@@ -6,7 +6,7 @@ import pandas as pd
 # Contains macros and fast setup abstractions
 
 
-def runExperimentUsingFramework(networkModule, learnerNodes, testDuration, learnerServerCooldown=6, appNodeServerCooldown=2, killTimeout=3, keyboardInterupRaise=False):
+def runExperimentUsingFramework(networkModule, learnerNodes, testDuration, learnerServerCooldown=6, appNodeServerCooldown=2, killTimeout=3, keyboardInterupRaise=True):
     """
         Outline assumptions here:
         -Daemon server on hosts

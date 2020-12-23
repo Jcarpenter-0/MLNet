@@ -1,4 +1,6 @@
 import subprocess
+from typing import Tuple
+
 import networks
 import apps.daemon_server
 
@@ -101,7 +103,7 @@ class MahiMahiLinkShell(MahiMahiShell):
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./../') -> networks.Node:
+def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./../') -> Tuple[networks.Node, str]:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
@@ -138,14 +140,14 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
 
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,
-                              stdout=subprocess.PIPE,
+                              #stdout=subprocess.PIPE,
                               stdin=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,
+                              #stderr=subprocess.STDOUT,
                               universal_newlines=True)
 
     print('MM Node http://{}:{}/ - {}'.format(ipAddress, daemonPort, mmProc.returncode))
 
-    return networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort)
+    return networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort), '100.64.0.1'
 
 
 def SetupMahiMahiNetwork(setupArgs:dict) -> networks.NetworkModule:

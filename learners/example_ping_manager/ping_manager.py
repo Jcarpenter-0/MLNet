@@ -55,31 +55,7 @@ if __name__ == '__main__':
 
     else:
         # Load the pattern
-        patternFP = open(miscArgs[0], 'r')
-
-        patternPieces = patternFP.readlines()
-
-        patternPieces[0] = patternPieces[0].replace('\n','')
-
-        patternFields = patternPieces[0].split(',')
-
-        pattern = []
-
-        for line in patternPieces[1:]:
-            patternDict = dict()
-
-            line = line.replace('\n','')
-
-            linePieces = line.split(',')
-
-            for idx, piece in enumerate(linePieces):
-                patternDict[patternFields[idx]] = piece
-
-            pattern.append(patternDict)
-
-        patternFP.close()
-
-        print(pattern)
+        pattern = learners.loadPatternFile(miscArgs[0])
 
         mlModule = learners.common.PatternModule(pattern)
 

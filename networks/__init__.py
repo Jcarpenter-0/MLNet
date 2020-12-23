@@ -76,7 +76,14 @@ class Node(object):
         self.Applications = []
 
     def AddApplication(self, appArgs:list):
-        self.Applications.append(appArgs)
+
+        appArgsCopy = appArgs.copy()
+
+        for idx, elem in enumerate(appArgs):
+            # Ensure string values
+            appArgsCopy[idx] = '{}'.format(elem)
+
+        self.Applications.append(appArgsCopy)
 
     def StartApplications(self, interApplicationDelay=0):
         """Start the applications on the node"""
@@ -159,18 +166,16 @@ class Node(object):
             print('{} has no proc, but is called to shutdown'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', interfaceIPSource:str='lo'):
+def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None):
 
     # run daemon server
     opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
 
     opProc = subprocess.Popen(opServerArgs,
-    stdout=subprocess.PIPE,
+    #stdout=subprocess.PIPE,
     stdin=subprocess.PIPE,
-    stderr=subprocess.STDOUT,
+    #stderr=subprocess.STDOUT,
     universal_newlines=True)
-
-    ipAddress = netifaces.ifaddresses(interfaceIPSource)[netifaces.AF_INET][0]['addr']
 
     print('Localhost node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
 
