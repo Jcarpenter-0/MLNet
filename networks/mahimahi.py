@@ -3,6 +3,7 @@ from typing import Tuple
 
 import networks
 import apps.daemon_server
+import apps.daemon_process
 
 
 def MakeMahiMahiLinkFile(bandwidth:int) -> list:
@@ -137,6 +138,9 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
 
         # add the operation server command
         mmCommands.extend(apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
+    else:
+        # add the proc daemon
+        mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset))
 
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,

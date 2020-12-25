@@ -1,3 +1,4 @@
+import apps.daemon_process
 import apps.daemon_server
 import networks
 import subprocess
@@ -110,6 +111,10 @@ def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=80
                 for idx in range(0, 1):
                     li = mnProc.stdout.readline()
                     print(li)
+            else:
+                # run the daemon proc
+                mnProc.stdin.write('{}\n'.format(apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset)))
+                mnProc.stdin.flush()
 
             nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port))
 

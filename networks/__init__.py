@@ -1,3 +1,4 @@
+import apps.daemon_process
 import apps.daemon_server
 import subprocess
 import requests
@@ -112,7 +113,7 @@ class Node(object):
                 print('Application: {} to process'.format(applicationArgs))
 
                 # Add a "background" command to the args
-                applicationArgs.append('&')
+                #applicationArgs.append('&')
 
                 # Add "endline" to signify end of command call
                 applicationArgs.append('\n')
@@ -143,7 +144,12 @@ class Node(object):
                 if response.ok is False:
                     raise Exception('Could not stop process on node')
             else:
-                print('Node {}: No daemon server to stop processes, must implement new logic to cease sub processes'.format(self.IpAddress))
+
+                cmdLine = 'STOP'
+
+                self.NodeProc.stdin.write(cmdLine)
+
+                self.NodeProc.stdin.flush()
 
         except Exception as ex:
             print(ex)
@@ -169,7 +175,11 @@ class Node(object):
 def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None):
 
     # run daemon server
-    opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
+    if daemonServerPort is not None:
+        opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
+    else:
+        # run daemon proc instead
+        opServerArgs = apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset)
 
     opProc = subprocess.Popen(opServerArgs,
     #stdout=subprocess.PIPE,
