@@ -2,10 +2,14 @@ import subprocess
 import json
 import os
 import sys
+import time
+import glob
+import shutil
 
 # intended for use by network sims that are not necessarily reachable for the daemon server
 
-def PrepareDaemonArgs(dirOffset='./'):
+
+def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100):
     '''
     Returns list of args for use in Popen()
 
@@ -16,48 +20,73 @@ def PrepareDaemonArgs(dirOffset='./'):
             Returns:
                     argList (list): List of args for use in Popen()
     '''
-    return ['python3', '{}apps/daemon_process.py'.format(dirOffset)]
+    return ['python3', '{}apps/daemon_process.py'.format(dirOffset), daemonServerWatchFilePath, '{}'.format(batchRate)]
 
 
-# this is an interactive process
+if __name__ == '__main__':
 
-ProcessArgsFieldLabel = 'args'
+    # List of procs that this daemon is in charge of
+    procs = []
 
-# List of procs that this daemon is in charge of
-procs = []
 
-try:
+    # Load the basic args
+    fileInputDir = sys.argv[1]
+    batchRate = int(sys.argv[2])
 
-    command = input('Command:')
+    run = True
 
-    while command is not None:
+    try:
 
-        commandDict = json.loads(command)
+        while(run):
 
-        if ProcessArgsFieldLabel in commandDict.keys():
-            popenCmd = commandDict[ProcessArgsFieldLabel]
+            # Read the input file
+            inputFiles = glob.glob(fileInputDir + '*')
 
-            procs.append(subprocess.Popen(popenCmd))
-        else:
-            # Assume its a stop all command
-            for proc in procs:
-                print('Killing Proc')
-                proc.kill()
-                proc.wait()
+            # snap shot of files, attempt to read them in order
+            for inputFile in inputFiles:
 
-        # Get next command
-        command = input('Command:')
+                inputFP = open(inputFile, 'r')
 
-except KeyboardInterrupt:
-    print('Ending daemon process')
-except EOFError as ex1:
-    print('Ending daemon process')
-except Exception as ex:
-    print(ex)
-finally:
-    # Kill all the stuff
-    for proc in procs:
-        proc.kill()
-        proc.wait()
+                command = inputFP.readline()
+                #print('Read {}'.format(command))
+                inputFP.close()
 
-    print('Sub Procs killed')
+                command = command.lstrip()
+
+                # erase file for input
+                inputFPEraser = open(inputFile, 'w')
+
+                inputFPEraser.flush()
+                inputFPEraser.close()
+
+                if 'STOP' in command:
+                    print('Stopping Daemon Procs')
+                    # Assume its a stop all command
+                    for proc in procs:
+                        print('Killing Proc')
+                        proc.kill()
+                        proc.wait()
+
+                elif len(command) > 0:
+                    # run new command
+                    print('Daemon - New Command')
+                    commands = command.split(' ')
+
+                    procs.append(subprocess.Popen(commands))
+
+                # Wait to check again
+                time.sleep(batchRate)
+
+    except KeyboardInterrupt:
+        print('Ending daemon process')
+    except EOFError as ex1:
+        print('Ending daemon process')
+    except Exception as ex:
+        print(ex)
+    finally:
+        # Kill all the stuff
+        for proc in procs:
+            proc.kill()
+            proc.wait()
+
+        print('Sub Procs killed')

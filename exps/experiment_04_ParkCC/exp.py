@@ -14,7 +14,8 @@ import apps.Iperf3
 import exps
 
 # Testing Macro Settings
-VerificationPatternFiles = ['./vegas-pattern.csv', './bbr-pattern.csv', './cubic-pattern.csv', './reno-pattern.csv']
+VerificationPatternFiles = []
+# './vegas-pattern.csv', './bbr-pattern.csv', './cubic-pattern.csv', './reno-pattern.csv'
 
 # Setup the learner
 learner = learners.common.Learner('{}./learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset))
@@ -27,7 +28,7 @@ mmShells.append(networks.mahimahi.MahiMahiLinkShell(upLinkLogFilePath='./const48
                                                     , uplinkQueue='droptail', uplinkQueueArgs='packets=400'
                                                     , downlinkQueue='droptail', downlinkQueueArgs='packets=400'))
 
-node, baseAddress = networks.mahimahi.SetupMahiMahiNode(mmShells)
+node, baseAddress = networks.mahimahi.SetupMahiMahiNode(mmShells, dirOffset=DirOffset)
 
 serverNode = networks.SetupLocalHost(ipAddress=baseAddress)
 
@@ -37,16 +38,17 @@ node.AddApplication(apps.PrepWrapperCall('{}apps/Iperf3.py'.format(DirOffset), [
 
 network = networks.NetworkModule(nodes=[serverNode, node])
 
-exps.runExperimentUsingFramework(network, [learner], 35060)
+exps.runExperimentUsingFramework(network, [learner], 30)
 
 # run a pattern test
-print('Testing')
 for idx, verPattern in enumerate(VerificationPatternFiles):
+    print('Testing with Pattern {}'.format(idx))
     learner = learners.common.Learner('{}./learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
                     , training=2
                     , traceFilePostFix='pattern-{}'.format(idx)
                     , miscArgs=[verPattern])
 
-    exps.runExperimentUsingFramework(network, [learner], 35060, appNodeServerCooldown=5)
+    exps.runExperimentUsingFramework(network, [learner], 120, appNodeServerCooldown=5)
+
 
 network.Shutdown()

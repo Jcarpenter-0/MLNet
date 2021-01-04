@@ -1,4 +1,7 @@
 import subprocess
+import os
+import shutil
+
 from typing import Tuple
 
 import networks
@@ -104,7 +107,7 @@ class MahiMahiLinkShell(MahiMahiShell):
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./../') -> Tuple[networks.Node, str]:
+def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str]:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
@@ -139,9 +142,19 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
         # add the operation server command
         mmCommands.extend(apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
     else:
-        # add the proc daemon
-        mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset))
+        # create input dir
+        try:
+            os.makedirs(inputDir)
+        except Exception as ex:
+            # erase the existing dirs and remake them
+            print('Exception making dirs, attempting remake')
+            shutil.rmtree(inputDir)
+            os.makedirs(inputDir)
 
+        # add the proc daemon
+        mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
+
+    print(mmCommands)
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,
                               #stdout=subprocess.PIPE,
@@ -151,7 +164,9 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
 
     print('MM Node http://{}:{}/ - {}'.format(ipAddress, daemonPort, mmProc.returncode))
 
-    return networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort), '100.64.0.1'
+    node = networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort, inputDir=inputDir)
+
+    return node, '100.64.0.1'
 
 
 def SetupMahiMahiNetwork(setupArgs:dict) -> networks.NetworkModule:
@@ -185,32 +200,5 @@ class MahiMahiNetworkDefinition(networks.__networkDefinition):
         return SetupMahiMahiNetwork(setupArgs)
 
 
-
 # https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
 # https://stackoverflow.com/questions/22163422/using-python-to-open-a-shell-environment-run-a-command-and-exit-environment
-
-if __name__ == '__main__':
-
-    print('Special imports')
-    import sys
-    import os
-    sys.path.insert(0, os.getcwd())
-    sys.path.insert(0, '../')
-
-    node = SetupMahiMahiNode([MahiMahiDelayShell(delayMS=10), MahiMahiDelayShell(delayMS=10)], dirOffset='../', runDaemonServer=False)
-
-    print(node.IpAddress)
-    print(node.NodeProc.returncode)
-
-    # Must run from cmd as from IDE dnsmasq have problems
-    #proc = subprocess.Popen(['mm-delay', '40'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-
-    # call limited ping
-    output, _ = node.NodeProc.communicate("ping 192.168.1.134 -c 2\n")
-
-    print(output)
-
-    # call limited ping again
-    node.NodeProc.wait()
-
-    print('Done')

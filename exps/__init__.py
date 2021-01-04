@@ -57,6 +57,7 @@ def runExperimentUsingFramework(networkModule, learnerNodes, testDuration, learn
         networkModule.StopNodes()
 
         # Shutdown/Stop experiment
+        print('Stopping Learner(s)')
         for learnerProc in learnerProcs:
 
             try:

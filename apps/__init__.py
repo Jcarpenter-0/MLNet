@@ -61,7 +61,7 @@ def SendToLearner(dataDict, learnerTarget, verbose=False) -> dict:
 def ParseDefaultArgs():
     """"""
 
-    appArgs = sys.argv[1:-2]
+    appArgs = sys.argv[1:]
 
     print("App Args {}".format(appArgs))
 

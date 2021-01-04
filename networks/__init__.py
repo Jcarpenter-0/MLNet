@@ -4,6 +4,8 @@ import subprocess
 import requests
 import time
 import json
+import os
+import shutil
 import netifaces
 
 
@@ -49,7 +51,6 @@ class NetworkModule(object):
                 print('Network Shutdown')
 
 
-
 class __networkDefinition(object):
 
     def __init__(self):
@@ -63,7 +64,7 @@ class __networkDefinition(object):
 
 class Node(object):
 
-    def __init__(self, ipAddress=None, daemonPort=None, nodeProc=None):
+    def __init__(self, ipAddress=None, daemonPort=None, nodeProc=None, inputDir:str=None):
         """
 
         Applications: List of application Args, list of list
@@ -75,6 +76,7 @@ class Node(object):
         self.NodeProc = nodeProc
         self.DaemonPort = daemonPort
         self.Applications = []
+        self.InputDir:str = inputDir
 
     def AddApplication(self, appArgs:list):
 
@@ -108,24 +110,26 @@ class Node(object):
                 if response.ok is False:
                     raise Exception("Problem raising process on node {} : {}".format(self.IpAddress, response.text))
 
-            elif self.NodeProc is not None:
-                # no IP or daemon, could use proc, but for my purposes will just error
-                print('Application: {} to process'.format(applicationArgs))
-
-                # Add a "background" command to the args
-                #applicationArgs.append('&')
-
-                # Add "endline" to signify end of command call
-                applicationArgs.append('\n')
+            elif self.NodeProc is not None and self.InputDir is not None:
+                # no IP or daemon, send data to proc (assuming the file IO based on)
+                print('Application: {} to process via file io'.format(applicationArgs))
 
                 cmdLine = ''
 
-                for arg in applicationArgs:
-                    cmdLine += arg + ' '
+                for idx, arg in enumerate(applicationArgs):
+                    cmdLine += arg
 
-                self.NodeProc.stdin.write(cmdLine)
+                    if idx != len(applicationArgs) -1:
+                        cmdLine += ' '
 
-                self.NodeProc.stdin.flush()
+                inputFilePath = self.InputDir + 'input.txt'
+
+                inputFP = open(inputFilePath, 'w')
+
+                inputFP.write(cmdLine)
+
+                inputFP.flush()
+                inputFP.close()
 
             else:
                 raise Exception('Node {} has no daemon'.format(self.IpAddress))
@@ -143,13 +147,19 @@ class Node(object):
 
                 if response.ok is False:
                     raise Exception('Could not stop process on node')
-            else:
+
+            elif self.NodeProc is not None and self.InputDir is not None:
+
+                inputFilePath = self.InputDir + 'input.txt'
 
                 cmdLine = 'STOP'
 
-                self.NodeProc.stdin.write(cmdLine)
+                inputFP = open(inputFilePath, 'w')
 
-                self.NodeProc.stdin.flush()
+                inputFP.write('{}'.format(cmdLine))
+
+                inputFP.flush()
+                inputFP.close()
 
         except Exception as ex:
             print(ex)
@@ -160,8 +170,8 @@ class Node(object):
         print('Shutting down node {}'.format(self.IpAddress))
         if self.NodeProc is not None:
 
-            self.NodeProc.terminate()
             try:
+                self.NodeProc.terminate()
                 self.NodeProc.wait(killTimeout)
             except Exception as timeout:
                 self.NodeProc.kill()
@@ -172,14 +182,22 @@ class Node(object):
             print('{} has no proc, but is called to shutdown'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None):
+def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/'):
 
     # run daemon server
     if daemonServerPort is not None:
         opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
     else:
         # run daemon proc instead
-        opServerArgs = apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset)
+        try:
+            os.makedirs(inputDir)
+        except Exception as ex:
+            # erase the existing dirs and remake them
+            print('Exception making dirs, attempting remake')
+            shutil.rmtree(inputDir)
+            os.makedirs(inputDir)
+
+        opServerArgs = apps.daemon_process.PrepareDaemonArgs(inputDir, dirOffset=dirOffset)
 
     opProc = subprocess.Popen(opServerArgs,
     #stdout=subprocess.PIPE,

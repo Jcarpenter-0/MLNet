@@ -3,6 +3,8 @@ import apps.daemon_server
 import networks
 import subprocess
 import time
+import os
+import shutil
 
 # https://www.saltycrane.com/blog/2009/10/how-capture-stdout-in-real-time-python/
 # https://gist.github.com/shreyakupadhyay/84dc75607ec1078aca3129c8958f3683
@@ -18,7 +20,7 @@ class MiniNetNetworkDefinition(networks.__networkDefinition):
         return SetupMiniNetNetwork(setupArgs)
 
 
-def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=8081, dirOffset='./', skipHostPrefix='s') -> networks.NetworkModule:
+def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
     """Setup a mininet network"""
 
     mnCommand = ['sudo', 'mn']
@@ -102,7 +104,7 @@ def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=80
 
                 daemonCLIArgs = apps.ToCLIArgs(daemonArgs)
 
-                print('NM run ' + "{} {} &\n".format(host, daemonCLIArgs))
+                print('MN run ' + "{} {} &\n".format(host, daemonCLIArgs))
                 mnProc.stdin.write("{} {}\n".format(host, daemonCLIArgs))
                 mnProc.stdin.flush()
 
@@ -112,8 +114,18 @@ def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=80
                     li = mnProc.stdout.readline()
                     print(li)
             else:
+
+                try:
+                    os.makedirs(inputDir)
+                except Exception as ex:
+                    # erase the existing dirs and remake them
+                    print('Exception making dirs, attempting remake')
+                    shutil.rmtree(inputDir)
+                    os.makedirs(inputDir)
+
+
                 # run the daemon proc
-                mnProc.stdin.write('{}\n'.format(apps.daemon_process.PrepareDaemonArgs(dirOffset=dirOffset)))
+                mnProc.stdin.write('{}\n'.format(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset)))
                 mnProc.stdin.flush()
 
             nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port))

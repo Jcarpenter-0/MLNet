@@ -198,9 +198,9 @@ if __name__ == '__main__':
 
     currentArgs = argDict.copy()
 
-    retryCount = 5
+    retryCount = 2
     retriesRemaining = retryCount
-    retryDelay = 2
+    retryDelay = 1
 
     fullFailure = False
 
