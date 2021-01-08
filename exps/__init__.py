@@ -3,6 +3,9 @@ import subprocess
 import requests
 import json
 import pandas as pd
+import networks
+import networks.mahimahi
+import networks.mininet
 # Contains macros and fast setup abstractions
 
 
@@ -77,12 +80,13 @@ def __registerModules() -> dict:
 
     modules = dict()
 
-
+    modules[networks.mahimahi.__name__] = networks.mahimahi.MahiMahiNetworkDefinition()
+    modules[networks.mininet.__name__] = networks.mininet.MiniNetNetworkDefinition()
 
     return modules
 
 
-def autoBuildEnv(soughtMetrics:list, fit:str='best', networkArgs:dict=None, tags:list=None, envManifestFilePath:str='modules.csv') -> list:
+def autoBuildEnv(soughtMetrics:list, fit:str='best', networkArgs:dict=None, tags:list=None, envManifestFilePath:str='modules.csv') -> networks.NetworkModule:
     """Attempt to build an environment for you based on what type of fit
     :return list of Nodes"""
 
@@ -109,4 +113,6 @@ def autoBuildEnv(soughtMetrics:list, fit:str='best', networkArgs:dict=None, tags
     #                                                  , 'http://100.64.0.1:{}'.format(pingManager.LearnerPort)))
 
 
-    return []
+    network = networks.NetworkModule()
+
+    return network

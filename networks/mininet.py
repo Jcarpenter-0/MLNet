@@ -11,19 +11,46 @@ import shutil
 # https://techandtrains.com/2013/11/24/mininet-host-talking-to-internet/
 # https://stackoverflow.com/questions/50421826/connecting-mininet-host-to-the-internet
 
+
 class MiniNetNetworkDefinition(networks.__networkDefinition):
 
     def Setup(self, setupArgs:dict) -> networks.NetworkModule:
         """Setup a mininet network, this will utilize many assumptions for the sake of speed,
          lower grain functionality is still easily doable via the component pieces."""
 
-        return SetupMiniNetNetwork(setupArgs)
+        topo = MiniNetTopology()
+
+        return SetupMiniNetNetwork(topo)
 
 
-def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
+class MiniNetTopology():
+
+    def __init__(self, topo:str, nodeCount:int, switchDensity:int):
+        self.TopoName = topo
+        self.NodeCount = nodeCount
+        self.SwitchDensity = switchDensity
+
+    def GetCLI(self) -> list:
+
+        cmdList = ['sudo', 'mn']
+
+        if self.TopoName is not None:
+            cmdList.append('--topo')
+            cmdList.append('{}'.format(self.TopoName))
+
+        if self.NodeCount is not None and self.NodeCount > 0:
+            cmdList.append(',{}'.format(self.NodeCount))
+
+            if self.SwitchDensity is not None and self.SwitchDensity > 0:
+                cmdList.append(',{}'.format(self.SwitchDensity))
+
+        return cmdList
+
+
+def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
     """Setup a mininet network"""
 
-    mnCommand = ['sudo', 'mn']
+    mnCommand = topology.GetCLI()
 
     mnProc = subprocess.Popen(mnCommand,
                                   stdout=subprocess.PIPE,
@@ -128,10 +155,10 @@ def SetupMiniNetNetwork(setupArgs:dict, runDaemonServer:bool=True, daemonPort=80
                 mnProc.stdin.write('{}\n'.format(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset)))
                 mnProc.stdin.flush()
 
-            nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port))
+            nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port, inputDir=inputDir))
 
     return networks.NetworkModule(networkProcs=[mnProc], nodes=nodes)
 
 
 if __name__ == '__main__':
-    tst = SetupMiniNetNetwork(dict())
+    tst = SetupMiniNetNetwork(MiniNetTopology(""))
