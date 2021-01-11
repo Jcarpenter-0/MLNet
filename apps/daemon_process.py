@@ -8,8 +8,11 @@ import shutil
 
 # intended for use by network sims that are not necessarily reachable for the daemon server
 
+def PrepareDaemonCLI(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100)->str:
+    return 'python3 {}apps/daemon_process.py {} {}'.format(dirOffset, daemonServerWatchFilePath, batchRate)
 
-def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100):
+
+def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100)->list:
     '''
     Returns list of args for use in Popen()
 

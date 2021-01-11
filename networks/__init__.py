@@ -6,7 +6,6 @@ import time
 import json
 import os
 import shutil
-import netifaces
 
 
 class NetworkModule(object):
@@ -51,17 +50,6 @@ class NetworkModule(object):
                 print('Network Shutdown')
 
 
-class __networkDefinition(object):
-
-    def __init__(self):
-        """Network Definition for the tools registry, intended to have the setup logic
-        (cli calls for example) for specific network tools"""
-        return
-
-    def Setup(self, setupArgs:dict) -> NetworkModule:
-        return NotImplementedError
-
-
 class Node(object):
 
     def __init__(self, ipAddress=None, daemonPort=None, nodeProc=None, inputDir:str=None):
@@ -93,26 +81,9 @@ class Node(object):
 
         for applicationArgs in self.Applications:
 
-            if self.IpAddress is not None and self.DaemonPort is not None:
-                # Send "go" via daemon web request
-
-                writeDict = {'args': applicationArgs}
-
-                # convert to json
-                jsonBody = json.dumps(writeDict).encode()
-
-                # send to the host server to start the application
-                print('Application: {} to http://{}:{}/'.format(writeDict, self.IpAddress, self.DaemonPort))
-
-                response = requests.post('http://{}:{}/processStart/'.format(self.IpAddress, self.DaemonPort),
-                                         data=jsonBody)
-
-                if response.ok is False:
-                    raise Exception("Problem raising process on node {} : {}".format(self.IpAddress, response.text))
-
-            elif self.NodeProc is not None and self.InputDir is not None:
+            if self.InputDir is not None:
                 # no IP or daemon, send data to proc (assuming the file IO based on)
-                print('Application: {} to process via file io'.format(applicationArgs))
+                print('Application: {} to process via file io {}'.format(applicationArgs, self.InputDir))
 
                 cmdLine = ''
 
@@ -130,6 +101,23 @@ class Node(object):
 
                 inputFP.flush()
                 inputFP.close()
+
+            elif self.IpAddress is not None and self.DaemonPort is not None:
+                # Send "go" via daemon web request
+
+                writeDict = {'args': applicationArgs}
+
+                # convert to json
+                jsonBody = json.dumps(writeDict).encode()
+
+                # send to the host server to start the application
+                print('Application: {} to http://{}:{}/'.format(writeDict, self.IpAddress, self.DaemonPort))
+
+                response = requests.post('http://{}:{}/processStart/'.format(self.IpAddress, self.DaemonPort),
+                                         data=jsonBody)
+
+                if response.ok is False:
+                    raise Exception("Problem raising process on node {} : {}".format(self.IpAddress, response.text))
 
             else:
                 raise Exception('Node {} has no daemon'.format(self.IpAddress))

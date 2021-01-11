@@ -1,15 +1,8 @@
 import time
 import subprocess
-import requests
-import json
-import pandas as pd
-import networks
-import networks.mahimahi
-import networks.mininet
-# Contains macros and fast setup abstractions
 
 
-def runExperimentUsingFramework(networkModule, learnerNodes, testDuration, learnerServerCooldown=6, appNodeServerCooldown=2, killTimeout=3, keyboardInterupRaise=True):
+def runExperimentUsingFramework(networkModule, learnerNodes:list, testDuration:int, learnerServerCooldown:int=6, appNodeServerCooldown:int=2, killTimeout:int=3, keyboardInterupRaise:bool=True):
     """
         Outline assumptions here:
         -Daemon server on hosts
@@ -73,46 +66,3 @@ def runExperimentUsingFramework(networkModule, learnerNodes, testDuration, learn
         print('Experiment Done')
         if keyboardInterupRaise and keyBoardInterupted:
             raise KeyboardInterrupt
-
-
-def __registerModules() -> dict:
-    """Register the modules so that the auto builder may call upon them"""
-
-    modules = dict()
-
-    modules[networks.mahimahi.__name__] = networks.mahimahi.MahiMahiNetworkDefinition()
-    modules[networks.mininet.__name__] = networks.mininet.MiniNetNetworkDefinition()
-
-    return modules
-
-
-def autoBuildEnv(soughtMetrics:list, fit:str='best', networkArgs:dict=None, tags:list=None, envManifestFilePath:str='modules.csv') -> networks.NetworkModule:
-    """Attempt to build an environment for you based on what type of fit
-    :return list of Nodes"""
-
-    modules = __registerModules()
-
-    toolsDF = pd.read_csv(envManifestFilePath)
-
-    networkSims = toolsDF[(toolsDF['module'] == 'Host') & (tags in toolsDF['tags']) & (networkArgs in toolsDF['configs'])]
-
-    applications = toolsDF[(toolsDF['module'] == 'Application') & (tags in toolsDF['tags']) & (soughtMetrics in toolsDF['metrics'])]
-
-    if fit is 'best':
-        pass
-    elif fit is 'absolute':
-        pass
-
-    # setup the stuff
-    #pingNode = networks.mahimahi.SetupMahiMahiNode([networks.mahimahi.MahiMahiDelayShell(delayMS=MahMahiNetworkDelay)]
-    #                                               , dirOffset=DirOffset)
-
-    #pingNode.AddApplication(apps.PrepWrapperCall(PingPath
-    #                                                   , InitialPingArgs
-    #                                                   , PingRuns
-    #                                                  , 'http://100.64.0.1:{}'.format(pingManager.LearnerPort)))
-
-
-    network = networks.NetworkModule()
-
-    return network

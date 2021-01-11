@@ -1,5 +1,6 @@
-import numpy as np
-import math
+import json
+import time
+import apps
 import numpy as np
 import subprocess
 
@@ -10,12 +11,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
-
-import subprocess
-import json
-import time
-
-import apps
+# Hack for overcoming some dir issues
 
 
 def DefineMetrics() -> dict:

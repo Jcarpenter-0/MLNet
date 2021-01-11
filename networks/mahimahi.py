@@ -169,36 +169,5 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
     return node, '100.64.0.1'
 
 
-def SetupMahiMahiNetwork(setupArgs:dict) -> networks.NetworkModule:
-    """Autobuilder method for creating a mahi mahi network"""
-
-    shellList = []
-
-    if 'link delay' in setupArgs.keys():
-        shellList.append(MahiMahiDelayShell(setupArgs['link delay']))
-
-    if 'uplink loss' in setupArgs.keys():
-        shellList.append(MahiMahiLossShell(setupArgs['uplink loss']))
-
-    if 'downlink loss' in setupArgs.keys():
-        shellList.append(MahiMahiLossShell(setupArgs['downlink loss'], 'downlink'))
-
-    if 'uplink trace' in setupArgs.keys() and 'downlink trace' in setupArgs.keys():
-        shellList.append(MahiMahiLinkShell(setupArgs['uplink trace'], setupArgs['downlink trace']))
-
-    node = SetupMahiMahiNode(shellList)
-
-    mmModule = networks.NetworkModule(nodes=[node])
-
-    return mmModule
-
-
-class MahiMahiNetworkDefinition(networks.__networkDefinition):
-
-    def Setup(self, setupArgs:dict) -> networks.NetworkModule:
-        """"""
-        return SetupMahiMahiNetwork(setupArgs)
-
-
 # https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
 # https://stackoverflow.com/questions/22163422/using-python-to-open-a-shell-environment-run-a-command-and-exit-environment

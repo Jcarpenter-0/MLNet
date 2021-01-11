@@ -200,7 +200,7 @@ class DomainModule(object):
         """Define the valid range of possible actions as a list of dicts for each valid input pattern."""
         return None
 
-    def DefineReward(self, observation):
+    def DefineReward(self, observation, rawObservation):
         """Define the reward for an observation"""
         return NotImplementedError
 
@@ -277,7 +277,7 @@ class DomainModule(object):
 
         filteredObservation = self.DefineObservation(observation)
 
-        reward = self.DefineReward(filteredObservation)
+        reward = self.DefineReward(filteredObservation, observation)
 
         if self.LogFileFP is not None:
 

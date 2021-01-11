@@ -12,20 +12,9 @@ import shutil
 # https://stackoverflow.com/questions/50421826/connecting-mininet-host-to-the-internet
 
 
-class MiniNetNetworkDefinition(networks.__networkDefinition):
+class MiniNetTopology:
 
-    def Setup(self, setupArgs:dict) -> networks.NetworkModule:
-        """Setup a mininet network, this will utilize many assumptions for the sake of speed,
-         lower grain functionality is still easily doable via the component pieces."""
-
-        topo = MiniNetTopology()
-
-        return SetupMiniNetNetwork(topo)
-
-
-class MiniNetTopology():
-
-    def __init__(self, topo:str, nodeCount:int, switchDensity:int):
+    def __init__(self, topo:str=None, nodeCount:int=0, switchDensity:int=0):
         self.TopoName = topo
         self.NodeCount = nodeCount
         self.SwitchDensity = switchDensity
@@ -36,18 +25,21 @@ class MiniNetTopology():
 
         if self.TopoName is not None:
             cmdList.append('--topo')
-            cmdList.append('{}'.format(self.TopoName))
 
-        if self.NodeCount is not None and self.NodeCount > 0:
-            cmdList.append(',{}'.format(self.NodeCount))
+            topoArgString = '{}'.format(self.TopoName)
 
-            if self.SwitchDensity is not None and self.SwitchDensity > 0:
-                cmdList.append(',{}'.format(self.SwitchDensity))
+            if self.NodeCount is not None and self.NodeCount > 0:
+                topoArgString += ',{}'.format(self.NodeCount)
+
+                if self.SwitchDensity is not None and self.SwitchDensity > 0:
+                    topoArgString += ',{}'.format(self.SwitchDensity)
+
+            cmdList.append(topoArgString)
 
         return cmdList
 
 
-def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
+def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
     """Setup a mininet network"""
 
     mnCommand = topology.GetCLI()
@@ -86,9 +78,11 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, dae
 
     print(hosts)
 
-    for host in hosts:
+    for hostNum, host in enumerate(hosts):
 
         if skipHostPrefix not in host:
+
+            hostSpecificDir = None
 
             # get the ip addresses from the ifconfig for each host
             print('{} ifconfig'.format(host))
@@ -103,9 +97,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, dae
 
             # skip the first line
             o1 = mnProc.stdout.readline()
-            print(o1)
             output = mnProc.stdout.readline()
-            print(output)
 
             ipLineRaw = output.lstrip().split('\n')[0]
             ipLinePieces = ipLineRaw.split(' ')
@@ -132,7 +124,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, dae
                 daemonCLIArgs = apps.ToCLIArgs(daemonArgs)
 
                 print('MN run ' + "{} {} &\n".format(host, daemonCLIArgs))
-                mnProc.stdin.write("{} {}\n".format(host, daemonCLIArgs))
+                mnProc.stdin.write("{} {} &\n".format(host, daemonCLIArgs))
                 mnProc.stdin.flush()
 
                 time.sleep(1)
@@ -141,21 +133,25 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=True, dae
                     li = mnProc.stdout.readline()
                     print(li)
             else:
+                print('Host {} - {}'.format(host, hostNum))
+                hostSpecificDir = inputDir + '{}/'.format(hostNum)
 
                 try:
-                    os.makedirs(inputDir)
+                    os.makedirs(hostSpecificDir)
                 except Exception as ex:
                     # erase the existing dirs and remake them
                     print('Exception making dirs, attempting remake')
-                    shutil.rmtree(inputDir)
-                    os.makedirs(inputDir)
-
+                    shutil.rmtree(hostSpecificDir)
+                    os.makedirs(hostSpecificDir)
 
                 # run the daemon proc
-                mnProc.stdin.write('{}\n'.format(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset)))
+                mnProc.stdin.write('{} {} &\n'.format(host, apps.daemon_process.PrepareDaemonCLI(daemonServerWatchFilePath=hostSpecificDir, dirOffset=dirOffset)))
                 mnProc.stdin.flush()
+                # Read for backgrounding
+                output = mnProc.stdout.readline()
+                print(output)
 
-            nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port, inputDir=inputDir))
+            nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port, inputDir=hostSpecificDir))
 
     return networks.NetworkModule(networkProcs=[mnProc], nodes=nodes)
 

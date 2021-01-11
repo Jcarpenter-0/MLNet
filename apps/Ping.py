@@ -1,5 +1,6 @@
 import numpy as np
 import subprocess
+import apps
 
 # Setup the dir
 DirOffset = '../../'
@@ -8,8 +9,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
-
-import apps
+# Hack for overcoming some dir issues
 
 
 def DefineMetrics() -> dict:

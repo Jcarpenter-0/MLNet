@@ -1,7 +1,8 @@
-import numpy as np
-import math
-import numpy as np
 import subprocess
+import numpy as np
+import json
+import time
+import apps
 
 # Setup the dir
 DirOffset = '../../'
@@ -10,12 +11,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
-
-import subprocess
-import json
-import time
-
-import apps
+# Hack for overcoming some dir issues
 
 
 def DefineMetrics() -> dict:
@@ -147,22 +143,22 @@ def ParseOutput(rawData:bytes) -> dict:
         snd = int(streamSender['max_snd_cwnd'])
         maxSendCWNDs.append(snd)
 
-        maxRTT = float(streamSender['max_rtt'])
+        maxRTT = int(streamSender['max_rtt'])
         maxRTTs.append(maxRTT)
 
-        minRTT = float(streamSender['min_rtt'])
+        minRTT = int(streamSender['min_rtt'])
         minRTTs.append(minRTT)
 
-        meanRTT = float(streamSender['mean_rtt'])
+        meanRTT = int(streamSender['mean_rtt'])
         avgRTTs.append(meanRTT)
 
     # Calculate macros
     dataDict['maxRTT'] = float(np.mean(maxRTTs))
     dataDict['minRTT'] = float(np.mean(minRTTs))
     dataDict['meanRTT'] = float(np.mean(avgRTTs))
-    dataDict['max_snd_cwnd'] = float(np.max(maxSendCWNDs))
+    dataDict['max_snd_cwnd'] = int(np.max(maxSendCWNDs))
     dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
-    dataDict['min_snd_cwnd'] = float(np.min(maxSendCWNDs))
+    dataDict['min_snd_cwnd'] = int(np.min(maxSendCWNDs))
 
     return dataDict
 
