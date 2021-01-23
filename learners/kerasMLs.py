@@ -1,4 +1,4 @@
-import learners.common
+import learners
 
 import os
 import numpy as np
@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
-class kerasActorCritic(learners.common.MLModule):
+class kerasActorCritic(learners.MLModule):
 
     def __init__(self
                  , learnerDir
@@ -57,7 +57,7 @@ class kerasActorCritic(learners.common.MLModule):
         self.running_reward = 0
         self.episode_count = 0
 
-    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.common.DomainModule):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.DomainModule):
 
         episode_reward = 0
 

@@ -1,6 +1,5 @@
 import json
 import time
-import apps
 import numpy as np
 import subprocess
 
@@ -12,44 +11,22 @@ import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 # Hack for overcoming some dir issues
+# https://serverfault.com/questions/566737/iperf-csv-output-format
 
+import apps
 
 def DefineMetrics() -> dict:
     """Defines what metrics this application provides. Result is dict with metric name and metric info."""
     metricDict = dict()
 
-    metricDict['host'] = str
-    metricDict['port'] = int
-    metricDict['version'] = str
-    metricDict['system_info'] = str
-    metricDict['time'] = str
-    metricDict['timesecs'] = int
-    metricDict['tcp_mss_default'] = int
-
-    metricDict['protocol'] = str
-    metricDict['num_streams'] = int
-    metricDict['blksize'] = int
-    metricDict['omit'] = int
-    metricDict['duration'] = int
-    metricDict['bytes'] = int
-    metricDict['blocks'] = int
-    metricDict['reverse'] = int
-
-    metricDict['sender-seconds'] = float
-    metricDict['sender-bytes'] = int
-    metricDict['sender-bps'] = float
-    metricDict['sender-retransmits'] = int
-
-    metricDict['receiver-seconds'] = float
-    metricDict['receiver-bytes'] = float
-    metricDict['receiver-bps'] = float
-
-    metricDict['maxRTT'] = float
-    metricDict['minRTT'] = float
-    metricDict['meanRTT'] = float
-    metricDict['max_snd_cwnd'] = float
-    metricDict['avg_snd_cwnd'] = float
-    metricDict['min_snd_cwnd'] = float
+    metricDict['timestamp'] = float
+    metricDict['source_addr'] = str
+    metricDict['source_port'] = int
+    metricDict['dest_addr'] = str
+    metricDict['dest_port'] = int
+    metricDict['interval'] = int
+    metricDict['transferred_bytes'] = int
+    metricDict['bits_per_second'] = float
 
     return metricDict
 
@@ -90,75 +67,20 @@ def ParseOutput(rawData:bytes) -> dict:
 
     outputRaw = rawData.decode()
 
-    output = json.loads(outputRaw)
+    output = outputRaw.split(',')
 
     dataDict = dict()
 
-    startSection = output['start']
+    dataDict['timestamp'] = output[0]
+    dataDict['source_addr'] = output[1]
+    dataDict['source_port'] = output[2]
 
-    dataDict['host'] = startSection['connecting_to']['host']
-    dataDict['port'] = startSection['connecting_to']['port']
-    dataDict['version'] = startSection['version']
-    dataDict['system_info'] = startSection['system_info']
-    dataDict['time'] = startSection['timestamp']['time']
-    dataDict['timesecs'] = startSection['timestamp']['timesecs']
-    dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
+    dataDict['dest_addr'] = output[3]
+    dataDict['dest_port'] = output[4]
 
-    dataDict['protocol'] = startSection['test_start']['protocol']
-    dataDict['num_streams'] = startSection['test_start']['num_streams']
-    dataDict['blksize'] = startSection['test_start']['blksize']
-    dataDict['omit'] = startSection['test_start']['omit']
-    dataDict['duration'] = startSection['test_start']['duration']
-    dataDict['bytes'] = startSection['test_start']['bytes']
-    dataDict['blocks'] = startSection['test_start']['blocks']
-    dataDict['reverse'] = startSection['test_start']['reverse']
-
-    endSection = output['end']
-
-    sendSection = endSection['sum_sent']
-
-    dataDict['sender-seconds'] = sendSection['seconds']
-    dataDict['sender-bytes'] = sendSection['bytes']
-    dataDict['sender-bps'] = sendSection['bits_per_second']
-    dataDict['sender-retransmits'] = sendSection['retransmits']
-
-    recSection = endSection['sum_received']
-
-    dataDict['receiver-seconds'] = recSection['seconds']
-    dataDict['receiver-bytes'] = recSection['bytes']
-    dataDict['receiver-bps'] = recSection['bits_per_second']
-
-    # Stream dissection
-    streamSection = endSection['streams']
-
-    minRTTs = []
-    maxRTTs = []
-    avgRTTs = []
-
-    maxSendCWNDs = []
-
-    for stream in streamSection:
-        streamSender = stream['sender']
-
-        snd = int(streamSender['max_snd_cwnd'])
-        maxSendCWNDs.append(snd)
-
-        maxRTT = float(streamSender['max_rtt'])
-        maxRTTs.append(maxRTT)
-
-        minRTT = float(streamSender['min_rtt'])
-        minRTTs.append(minRTT)
-
-        meanRTT = float(streamSender['mean_rtt'])
-        avgRTTs.append(meanRTT)
-
-    # Calculate macros
-    dataDict['maxRTT'] = float(np.max(minRTTs))
-    dataDict['minRTT'] = float(np.min(minRTTs))
-    dataDict['meanRTT'] = float(np.mean(avgRTTs))
-    dataDict['max_snd_cwnd'] = float(np.max(maxSendCWNDs))
-    dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
-    dataDict['min_snd_cwnd'] = float(np.min(maxSendCWNDs))
+    dataDict['interval'] = output[6]
+    dataDict['transferred_bytes'] = int(output[7])
+    dataDict['bits_per_second'] = float(output[8])
 
     return dataDict
 
@@ -173,7 +95,7 @@ def __runIperf3(args:dict) -> dict:
     # Quiet the output for easier parsing
     if '-y' not in command:
         command.append('-y')
-        command.append('-c')
+        command.append('c')
 
     outputRaw = subprocess.check_output(command)
 
@@ -182,8 +104,8 @@ def __runIperf3(args:dict) -> dict:
     # Add the action args
     output.update(args)
 
-    if '-C' not in command:
-        output['-C'] = __getCC()
+    if '-Z' not in command:
+        output['-Z'] = __getCC()
 
     return output
 

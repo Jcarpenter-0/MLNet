@@ -1,6 +1,6 @@
 import numpy as np
 
-import learners.common
+import learners
 
 import networks
 import networks.mahimahi
@@ -50,13 +50,13 @@ class __registryModule:
 
 class __applicationModuleRegister(__registryModule):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.common.Learner, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.Learner, dirOffset='../../'):
         return NotImplementedError
 
 
 class __iperfApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.common.Learner, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.Learner, dirOffset='../../'):
         """Setup a client and server iperf pair. Will assume first and last nodes are the server and client"""
 
         firstNode:networks.Node = network.Nodes[0]
@@ -87,7 +87,7 @@ class __iperfApplicationModuleRegister(__applicationModuleRegister):
 
 class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.common.Learner, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.Learner, dirOffset='../../'):
         firstNode: networks.Node = network.Nodes[0]
         lastNode: networks.Node = network.Nodes[-1]
 
@@ -117,7 +117,7 @@ class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
 
 class __pingApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.common.Learner, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:learners.Learner, dirOffset='../../'):
         firstNode: networks.Node = network.Nodes[0]
         lastNode: networks.Node = network.Nodes[-1]
 
@@ -141,14 +141,14 @@ class __pingApplicationModuleRegister(__applicationModuleRegister):
 
 class __networkModuleRegister(__registryModule):
 
-    def Setup(self, setupArgs:dict, learner:learners.common.Learner, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:learners.Learner, dirOffset='../../') -> networks.NetworkModule:
         """The call to setup the network, should result in a running network awaiting application calls"""
         return NotImplementedError
 
 
 class __mahiMahiNetworkModuleRegister(__networkModuleRegister):
 
-    def Setup(self, setupArgs:dict, learner:learners.common.Learner, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:learners.Learner, dirOffset='../../') -> networks.NetworkModule:
         """Autobuilder method for creating a mahi mahi network"""
 
         shellList = []
@@ -167,14 +167,16 @@ class __mahiMahiNetworkModuleRegister(__networkModuleRegister):
 
         node = networks.mahimahi.SetupMahiMahiNode(shellList, dirOffset=dirOffset)
 
-        mmModule = networks.NetworkModule(nodes=[node])
+        hostNode = networks.SetupLocalHost(dirOffset=dirOffset)
+
+        mmModule = networks.NetworkModule(nodes=[hostNode, node])
 
         return mmModule
 
 
 class __miniNetNetworkModuleRegister(__networkModuleRegister):
 
-    def Setup(self, setupArgs:dict, learner:learners.common.Learner, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:learners.Learner, dirOffset='../../') -> networks.NetworkModule:
         """Setup a mininet network, this will utilize many assumptions for the sake of speed,
          lower grain functionality is still easily doable via the component pieces."""
 
@@ -253,7 +255,7 @@ def __registerModules(envManifestFilePath:str='modules.csv', mainDelimister=',',
     return modules
 
 
-def autoBuildEnv(learner:learners.common.Learner, soughtMetrics:list=[], networkArgs:dict={}, tags:list=[], fit:str='best', envManifestFilePath:str='modules.csv', dirOffset='../../', skipApps=False) -> networks.NetworkModule:
+def autoBuildEnv(learner:learners.Learner, soughtMetrics:list=[], networkArgs:dict={}, tags:list=[], fit:str='best', envManifestFilePath:str='modules.csv', dirOffset='../../', skipApps=False) -> networks.NetworkModule:
     """Attempt to build an environment for you based on what type of fit
     :return list of Nodes"""
 

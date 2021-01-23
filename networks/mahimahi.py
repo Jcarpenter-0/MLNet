@@ -1,3 +1,4 @@
+import numpy as np
 import subprocess
 import os
 import shutil
@@ -51,19 +52,37 @@ class MahiMahiShell():
 
 class MahiMahiDelayShell(MahiMahiShell):
 
-    def __init__(self, delayMS=0):
+    def __init__(self, delayMS=0, uplinkLogFilePath:str=None, downLinkLogFilePath:str=None):
         super().__init__()
         self.Command = 'mm-delay'
         self.Args.append(delayMS)
 
+        # Args for logging the per packet data in mm format
+        if uplinkLogFilePath is not None:
+            self.Args.append('--uplink-log')
+            self.Args.append('{}'.format(uplinkLogFilePath))
+
+        if downLinkLogFilePath is not None:
+            self.Args.append('--downlink-log')
+            self.Args.append('{}'.format(downLinkLogFilePath))
+
 
 class MahiMahiLossShell(MahiMahiShell):
 
-    def __init__(self, lossPercentage=0.0, linkDirection='uplink'):
+    def __init__(self, lossPercentage=0.0, linkDirection='uplink', uplinkLogFilePath:str=None, downLinkLogFilePath:str=None):
         super().__init__()
         self.Command = 'mm-loss'
         self.Args.append(linkDirection)
         self.Args.append(lossPercentage)
+
+        # Args for logging the per packet data in mm format
+        if uplinkLogFilePath is not None:
+            self.Args.append('--uplink-log')
+            self.Args.append('{}'.format(uplinkLogFilePath))
+
+        if downLinkLogFilePath is not None:
+            self.Args.append('--downlink-log')
+            self.Args.append('{}'.format(downLinkLogFilePath))
         
     def GetParaString(self):
         paraString = super(MahiMahiLossShell, self).GetParaString()
@@ -77,11 +96,11 @@ class MahiMahiLossShell(MahiMahiShell):
 
 class MahiMahiLinkShell(MahiMahiShell):
 
-    def __init__(self, upLinkLogFilePath, downLinkLogFilePath, uplinkQueue:str=None, uplinkQueueArgs:str=None, downlinkQueue:str=None, downlinkQueueArgs:str=None):
+    def __init__(self, upLinkTraceFilePath, downLinkTraceFilePath, uplinkLogFilePath:str=None, downLinkLogFilePath:str=None, uplinkQueue:str=None, uplinkQueueArgs:str=None, downlinkQueue:str=None, downlinkQueueArgs:str=None):
         super().__init__()
         self.Command = 'mm-link'
-        self.Args.append(upLinkLogFilePath)
-        self.Args.append(downLinkLogFilePath)
+        self.Args.append(upLinkTraceFilePath)
+        self.Args.append(downLinkTraceFilePath)
 
         if uplinkQueue is not None:
             self.Args.append('--uplink-queue={}'.format(uplinkQueue))
@@ -95,7 +114,14 @@ class MahiMahiLinkShell(MahiMahiShell):
             if downlinkQueueArgs is not None:
                 self.Args.append('--downlink-queue-args=\"{}\"'.format(uplinkQueueArgs))
 
+        # Args for logging the per packet data in mm format
+        if uplinkLogFilePath is not None:
+            self.Args.append('--uplink-log')
+            self.Args.append('{}'.format(uplinkLogFilePath))
 
+        if downLinkLogFilePath is not None:
+            self.Args.append('--downlink-log')
+            self.Args.append('{}'.format(downLinkLogFilePath))
 
     def GetParaString(self):
         paraString = super(MahiMahiLinkShell, self).GetParaString()
@@ -167,6 +193,74 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
     node = networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort, inputDir=inputDir)
 
     return node, '100.64.0.1'
+
+
+def ParseMMLogFile(logFilePath:str, timeGrouping:int=0) -> list:
+    """Parse a mahimahi format trace"""
+
+    fp = open(logFilePath, 'r')
+    logFileLinesRaw = fp.readlines()
+    fp.close()
+
+    baseTimestamp = int(logFileLinesRaw[4].split(':')[-1].lstrip())
+
+    packetLogLines = logFileLinesRaw[6:]
+
+    # list of dicts
+    outputLines = []
+
+    times = []
+    delays = []
+    sizes = []
+
+    currentGroupStartTS = 0
+    currentGroupSize = 0
+    currentGroupDelays = []
+
+    for logLineRaw in packetLogLines:
+
+        logLineRaw = logLineRaw.replace('\n','')
+
+        if '-' in logLineRaw:
+            # Delivery success
+            linePieces = logLineRaw.split(' ')
+
+            packetTimestamp = int(linePieces[0]) - baseTimestamp
+
+            packetSize = int(linePieces[2])
+
+            # packet delay ms
+            packetDelay = int(linePieces[3])
+
+            delays.append(packetDelay)
+            sizes.append(packetSize)
+            times.append(packetTimestamp)
+
+            # in next group?
+            if packetTimestamp >= currentGroupStartTS + timeGrouping and timeGrouping is not 0:
+                # output last group
+                dataLine = {'timestamp(ms)': '{}'.format(currentGroupStartTS), 'bytes': '{}'.format(currentGroupSize),
+                            'delay(ms)': '{}'.format(np.mean(currentGroupDelays))}
+
+                outputLines.append(dataLine)
+
+                currentGroupSize = 0
+                currentGroupDelays = []
+                currentGroupStartTS += timeGrouping
+            elif timeGrouping is 0:
+                dataLine = {'timestamp(ms)': '{}'.format(packetTimestamp), 'bytes': '{}'.format(packetSize),
+                            'delay(ms)': '{}'.format(packetDelay)}
+
+                outputLines.append(dataLine)
+
+            # in current group
+            currentGroupDelays.append(packetDelay)
+            currentGroupSize += packetSize
+
+    print('Packet Delay Stats: mean {} min {} max {} std {}'.format(np.mean(delays), np.min(delays), np.max(delays), np.std(delays)))
+    print('Total sent: {} Bytes'.format(np.sum(sizes)))
+
+    return outputLines
 
 
 # https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/

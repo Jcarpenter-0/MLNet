@@ -2,7 +2,6 @@ import subprocess
 import numpy as np
 import json
 import time
-import apps
 
 # Setup the dir
 DirOffset = '../../'
@@ -13,6 +12,7 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 # Hack for overcoming some dir issues
 
+import apps
 
 def DefineMetrics() -> dict:
     """Defines what metrics this application provides. Result is dict with metric name and metric info."""
