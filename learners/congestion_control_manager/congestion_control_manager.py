@@ -43,16 +43,17 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
         # goodput (stated in copa paper, backed by ccp code, backed by park code)
         throughput = float(observation['bits_per_second'])
 
+        delay = 0
+
         # delay in ms (iperf gives it in usecs, backed in park, and backed in ccp codes)
-        delay = ((float(observation['meanRTT']) - float(observation['minRTT']))/1000)
+        #delay = ((float(observation['meanRTT']) - float(observation['minRTT']))/1000)
+
+        lostPackets = 0
 
         # TCP retransmits seem too low for it to make sense
-        lostPackets = int(rawObservation['sender-retransmits'])
+        #lostPackets = int(rawObservation['sender-retransmits'])
 
         # TCP retransmits
-
-        print('Reward: tput {} delay {} lost {}'.format(throughput, delay, lostPackets))
-
         reward = 0
 
         if throughput > 0:
@@ -63,8 +64,6 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
 
         if lostPackets > 0:
             reward = reward - math.log2(lostPackets)
-
-        print("Reward = {}".format(reward))
 
         return reward
 

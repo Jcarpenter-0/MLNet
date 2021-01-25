@@ -133,7 +133,7 @@ if __name__ == '__main__':
             result = __runIperf3(currentArgs)
 
             if endpoint is not None:
-                response = apps.SendToLearner(result, endpoint, verbose=True)
+                response = apps.SendToLearner(result, endpoint)
 
                 currentArgs = apps.UpdateArgs(currentArgs, response)
 

@@ -8,11 +8,11 @@ import shutil
 
 # intended for use by network sims that are not necessarily reachable for the daemon server
 
-def PrepareDaemonCLI(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100)->str:
+def PrepareDaemonCLI(daemonServerWatchFilePath:str, dirOffset='./', batchRate:float=1)->str:
     return 'python3 {}apps/daemon_process.py {} {}'.format(dirOffset, daemonServerWatchFilePath, batchRate)
 
 
-def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:int=100)->list:
+def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:float=1)->list:
     '''
     Returns list of args for use in Popen()
 
@@ -30,7 +30,6 @@ if __name__ == '__main__':
 
     # List of procs that this daemon is in charge of
     procs = []
-
 
     # Load the basic args
     fileInputDir = sys.argv[1]
@@ -63,16 +62,25 @@ if __name__ == '__main__':
                 inputFPEraser.close()
 
                 if 'STOP' in command:
-                    print('Stopping Daemon Procs')
-                    # Assume its a stop all command
+                    print('Daemon Process: Stopping all Procs')
                     for proc in procs:
-                        print('Killing Proc')
                         proc.kill()
                         proc.wait()
 
+                    # Read the input file
+                    inputFiles = glob.glob(fileInputDir + '*')
+
+                    # snap shot of files, attempt to read them in order
+                    for inputFile in inputFiles:
+                        # erase file for input
+                        inputFPEraser = open(inputFile, 'w')
+
+                        inputFPEraser.flush()
+                        inputFPEraser.close()
+
                 elif len(command) > 0:
                     # run new command
-                    print('Daemon - New Command')
+                    print('Daemon Process: New Command')
                     commands = command.split(' ')
 
                     procs.append(subprocess.Popen(commands))
@@ -81,9 +89,9 @@ if __name__ == '__main__':
                 time.sleep(batchRate)
 
     except KeyboardInterrupt:
-        print('Ending daemon process')
+        pass
     except EOFError as ex1:
-        print('Ending daemon process')
+        pass
     except Exception as ex:
         print(ex)
     finally:
@@ -92,4 +100,16 @@ if __name__ == '__main__':
             proc.kill()
             proc.wait()
 
-        print('Sub Procs killed')
+        # Read the input file
+        inputFiles = glob.glob(fileInputDir + '*')
+
+        # snap shot of files, attempt to read them in order
+        for inputFile in inputFiles:
+
+            # erase file for input
+            inputFPEraser = open(inputFile, 'w')
+
+            inputFPEraser.flush()
+            inputFPEraser.close()
+
+        print('Daemon Process: Clean Up')

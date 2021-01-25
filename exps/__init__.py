@@ -36,8 +36,7 @@ def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCo
     finally:
         # Stop apps
         print('Stopping Apps')
-        networkModule.StopNodes()
-
+        networkModule.StopNodes(interNodeDelay=appNodeServerCooldown)
         print('Experiment Done')
         if keyboardInterupRaise and keyBoardInterupted:
             raise KeyboardInterrupt

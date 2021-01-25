@@ -83,8 +83,6 @@ class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
 
         global ApplicationProcs
 
-        print(self.path)
-
         itemPath = self.path
 
         # Parse out necessary parameters
@@ -146,10 +144,14 @@ class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
                 proc.wait()
                 del ApplicationProcs[processID]
             else:
+                print('Daemon Server: Killing {} procs'.format(len(ApplicationProcs)))
                 for index, proc in enumerate(ApplicationProcs):
+                    print('Daemon Server: attempt to kill {}'.format(proc))
                     proc.kill()
                     proc.wait()
-                    del ApplicationProcs[index]
+                    print('Daemon Server: {} killed'.format(proc))
+
+                ApplicationProcs.clear()
         else:
             dataDict['ERROR'] = 'No matching command'
 
@@ -175,6 +177,13 @@ class DaemonServer(object):
     def cleanup(self):
         self.httpd.shutdown()
 
+        for index, proc in enumerate(ApplicationProcs):
+            proc.kill()
+            proc.wait()
+            print('Daemon Server: {} killed'.format(proc))
+
+        ApplicationProcs.clear()
+
 
 if __name__ == '__main__':
 
@@ -190,7 +199,7 @@ if __name__ == '__main__':
     daemonServer = DaemonServer(address, port)
 
     # 0.0.0.0 means listen on any address, stating localhost breaks it for external connections
-    print('App Server: http://{}:{}/ {}'.format(address, port, os.getcwd()))
+    print('Daemon Server: http://{}:{}/ {}'.format(address, port, os.getcwd()))
 
     try:
         daemonServer.run()
@@ -200,4 +209,4 @@ if __name__ == '__main__':
         print(str(ex))
     finally:
         daemonServer.cleanup()
-        print('Server cleaned up')
+        print('Daemon Server: Cleaned up')

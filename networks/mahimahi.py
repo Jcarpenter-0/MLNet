@@ -180,7 +180,6 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
         # add the proc daemon
         mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
 
-    print(mmCommands)
     # run actual time to finish
     mmProc = subprocess.Popen(mmCommands,
                               #stdout=subprocess.PIPE,

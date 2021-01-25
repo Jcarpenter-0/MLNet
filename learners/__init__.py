@@ -62,7 +62,6 @@ class Learner(object):
     def __init__(self, learnerScriptPath
                  , learnerDir='./tmp/'
                  , learnerPort=8080
-                 , learnerAddress=None
                  , training=1
                  , traceFilePostFix=''
                  , miscArgs=[]):
@@ -70,9 +69,6 @@ class Learner(object):
          and a server to host on. Intended to call a learner's setup script in /learners/ and pass some args."""
         self.LearnerScriptPath = learnerScriptPath
         self.LearnerPort = learnerPort
-        self.LearnerAddress = learnerAddress
-        if self.LearnerAddress is None:
-            self.LearnerAddress = ''
 
         self.LearnerDir = learnerDir
         self.Training = training
@@ -81,9 +77,6 @@ class Learner(object):
 
         self.TraceFilePostFix = traceFilePostFix
         self.MiscArgs = miscArgs
-
-    def GetURL(self) -> str:
-        return 'http://{}:{}/'.format(self.LearnerAddress, self.LearnerPort)
 
     def ToArgs(self):
         """
@@ -95,7 +88,7 @@ class Learner(object):
 
         commandArgs.extend([
             '{}'.format(self.LearnerPort)
-            , self.LearnerAddress
+            , ''
             , '{}'.format(self.Training)
             , self.LearnerDir
             , self.TraceFilePostFix])

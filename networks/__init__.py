@@ -26,10 +26,11 @@ class NetworkModule(object):
             node.StartApplications(interApplicationDelay)
             time.sleep(interNodeDelay)
 
-    def StopNodes(self):
+    def StopNodes(self, interNodeDelay=0, interApplicationDelay=0):
         """Only stop the applications running on the nodes"""
         for node in self.Nodes:
             node.StopApplications()
+            time.sleep(interNodeDelay)
 
     def Shutdown(self, killTimeout=2):
         """Shutdown all the processes on the nodes, and the network itself"""
@@ -131,7 +132,11 @@ class Node(object):
         try:
             if self.IpAddress is not None and self.DaemonPort is not None:
                 # Send "stop" via daemon
-                response = requests.post('http://{}:{}/processStop/'.format(self.IpAddress, self.DaemonPort))
+                target = 'http://{}:{}/processStop/'.format(self.IpAddress, self.DaemonPort)
+
+                print('Application Stop to {}'.format(target))
+
+                response = requests.post(target)
 
                 if response.ok is False:
                     raise Exception('Could not stop process on node')
@@ -139,6 +144,8 @@ class Node(object):
             elif self.NodeProc is not None and self.InputDir is not None:
 
                 inputFilePath = self.InputDir + 'input.txt'
+
+                print('Application Stop to {}'.format(inputFilePath))
 
                 cmdLine = 'STOP'
 
