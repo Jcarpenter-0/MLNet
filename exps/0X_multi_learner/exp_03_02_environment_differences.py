@@ -50,7 +50,7 @@ for topo in Topologies:
     iperfServerNode = networks.mahimahi.SetupMahiMahiNode([topo], dirOffset=DirOffset)
 
     iperfClientNode.AddApplication(
-        ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+        ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
             , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
          '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearner.LearnerPort)])
 
@@ -79,7 +79,7 @@ for topo in Topologies:
             iperfServerNode.AddApplication(['iperf3', '-s'])
 
             iperfClientNode.AddApplication(
-                ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                     , '-c', '100.64.0.1', '-t', '{}'.format(IperfRunLength),
                  '{}'.format(IperfRunCount), 'http://localhost:{}'.format(testingLearner.LearnerPort)])
 

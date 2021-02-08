@@ -141,14 +141,14 @@ class DaemonServerHandler(http.server.SimpleHTTPRequestHandler):
             if processID is not None:
                 proc = ApplicationProcs[processID]
                 proc.kill()
-                proc.wait()
+                proc.wait(timeout=10)
                 del ApplicationProcs[processID]
             else:
                 print('Daemon Server: Killing {} procs'.format(len(ApplicationProcs)))
                 for index, proc in enumerate(ApplicationProcs):
                     print('Daemon Server: attempt to kill {}'.format(proc))
                     proc.kill()
-                    proc.wait()
+                    proc.wait(timeout=10)
                     print('Daemon Server: {} killed'.format(proc))
 
                 ApplicationProcs.clear()

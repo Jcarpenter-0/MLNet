@@ -15,6 +15,26 @@ sys.path.insert(0, DirOffset)
 
 import apps
 
+
+def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000) -> list:
+
+    iperfCommands = ['-c', targetIPaddress]
+
+    if parallelTCPConnections is not None:
+        iperfCommands.append('-P')
+        iperfCommands.append(parallelTCPConnections)
+
+    if runDuration is not None:
+        iperfCommands.append('-t')
+        iperfCommands.append(runDuration)
+
+    if congestionControl is not None:
+        iperfCommands.append('-Z')
+        iperfCommands.append(congestionControl)
+
+    commands = apps.PrepWrapperCall('{}apps/Iperf.py'.format(DirOffset), iperfCommands, iperfRunTimes, 'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    return commands
+
 def DefineMetrics() -> dict:
     """Defines what metrics this application provides. Result is dict with metric name and metric info."""
     metricDict = dict()
@@ -71,6 +91,9 @@ def ParseOutput(rawData:bytes) -> dict:
 
     dataDict = dict()
 
+    if len(outputRaw) <= 0:
+        raise Exception('No Iperf output')
+
     dataDict['timestamp'] = output[0]
     dataDict['source_addr'] = output[1]
     dataDict['source_port'] = output[2]
@@ -95,7 +118,7 @@ def __runIperf3(args:dict) -> dict:
     # Quiet the output for easier parsing
     if '-y' not in command:
         command.append('-y')
-        command.append('c')
+        command.append('C')
 
     outputRaw = subprocess.check_output(command)
 
@@ -117,9 +140,9 @@ if __name__ == '__main__':
 
     currentArgs = argDict.copy()
 
-    retryCount = 5
+    retryCount = 2
     retriesRemaining = retryCount
-    retryDelay = 2
+    retryDelay = 1
 
     fullFailure = False
 

@@ -119,16 +119,15 @@ class DomainModule(object):
         self.SessionStart = datetime.datetime.now()
         self.CoreDir = loggingDirPath
         self.DomainConfigFilePath = loggingDirPath + 'domainconf.json'
-        self.ReportFilePath = loggingDirPath + 'session-reports.json'
         self.LogFileDir = loggingDirPath + 'Traces/'
-        self.LogFileName = '{}-{}-session-log.csv'.format(self.SessionStart.strftime(self.DateFormat), traceFilePostFix)
+        self.LogFilePath = '{}-{}-session-log.csv'.format(self.SessionStart.strftime(self.DateFormat), traceFilePostFix)
 
         # Ensure the existence of paths
         os.makedirs(self.CoreDir, exist_ok=True)
         os.makedirs(self.LogFileDir, exist_ok=True)
 
         # Setup the Trace File pointers
-        self.LogFileFP = open(self.LogFileDir + self.LogFileName, 'w')
+        self.LogFileFP = open(self.LogFileDir + self.LogFilePath, 'w')
         self.FirstLogWrite = True
 
         # define initial total actionSpace
@@ -305,14 +304,17 @@ class PatternModule(MLModule):
 
     def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition):
 
-        returnDict = self.Pattern[self.PatternIndex]
-        self.PatternIndex += 1
+        returnDict = dict()
 
-        # Handle pattern wrap around
-        if self.PatternIndex == len(self.Pattern):
-            self.PatternIndex = 0
+        if self.Pattern is not None:
+            returnDict = self.Pattern[self.PatternIndex]
+            self.PatternIndex += 1
 
-        print('Pattern Module - Next Action - {}'.format(returnDict))
+            # Handle pattern wrap around
+            if self.PatternIndex == len(self.Pattern):
+                self.PatternIndex = 0
+
+            print('Learner: Pattern Module - Next Action - {}'.format(returnDict))
 
         return returnDict
 

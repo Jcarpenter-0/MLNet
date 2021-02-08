@@ -26,6 +26,27 @@ def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:f
     return ['python3', '{}apps/daemon_process.py'.format(dirOffset), daemonServerWatchFilePath, '{}'.format(batchRate)]
 
 
+def Cleanup(procs:list, fileInputDir:str, ):
+    print('Daemon Process: Stopping {} Procs'.format(len(procs)))
+    for proc in procs:
+        proc.kill()
+        proc.wait()
+        print('Daemon Process: Proc killed')
+
+    procs.clear()
+
+    # Read the input file
+    inputFiles = glob.glob(fileInputDir + '*')
+
+    # snap shot of files, attempt to read them in order
+    for inputFile in inputFiles:
+        # erase file for input
+        inputFPEraser = open(inputFile, 'w')
+
+        inputFPEraser.flush()
+        inputFPEraser.close()
+
+
 if __name__ == '__main__':
 
     # List of procs that this daemon is in charge of
@@ -50,7 +71,6 @@ if __name__ == '__main__':
                 inputFP = open(inputFile, 'r')
 
                 command = inputFP.readline()
-                #print('Read {}'.format(command))
                 inputFP.close()
 
                 command = command.lstrip()
@@ -61,23 +81,12 @@ if __name__ == '__main__':
                 inputFPEraser.flush()
                 inputFPEraser.close()
 
-                if 'STOP' in command:
-                    print('Daemon Process: Stopping all Procs')
-                    for proc in procs:
-                        proc.kill()
-                        proc.wait()
+                if 'STOP\n' in command:
+                    Cleanup(procs, fileInputDir)
 
-                    # Read the input file
-                    inputFiles = glob.glob(fileInputDir + '*')
-
-                    # snap shot of files, attempt to read them in order
-                    for inputFile in inputFiles:
-                        # erase file for input
-                        inputFPEraser = open(inputFile, 'w')
-
-                        inputFPEraser.flush()
-                        inputFPEraser.close()
-
+                elif 'EXIT\n' in command:
+                    print('Daemon Process: Stopping Process NOTE: THIS IS ONLY FOR NETWORK SHUTDOWN')
+                    raise KeyboardInterrupt()
                 elif len(command) > 0:
                     # run new command
                     print('Daemon Process: New Command')
@@ -95,21 +104,6 @@ if __name__ == '__main__':
     except Exception as ex:
         print(ex)
     finally:
-        # Kill all the stuff
-        for proc in procs:
-            proc.kill()
-            proc.wait()
-
-        # Read the input file
-        inputFiles = glob.glob(fileInputDir + '*')
-
-        # snap shot of files, attempt to read them in order
-        for inputFile in inputFiles:
-
-            # erase file for input
-            inputFPEraser = open(inputFile, 'w')
-
-            inputFPEraser.flush()
-            inputFPEraser.close()
-
+        print('Daemon Process: Being killed')
+        Cleanup(procs, fileInputDir)
         print('Daemon Process: Clean Up')

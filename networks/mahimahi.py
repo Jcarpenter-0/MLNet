@@ -173,7 +173,7 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
             os.makedirs(inputDir)
         except Exception as ex:
             # erase the existing dirs and remake them
-            print('Exception making dirs, attempting remake')
+            print('Framework: Mahimahi Daemon Setup: Exception making input dirs, attempting remake')
             shutil.rmtree(inputDir)
             os.makedirs(inputDir)
 
@@ -181,15 +181,15 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=True, daemonPort=8081, dirOf
         mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
 
     # run actual time to finish
-    mmProc = subprocess.Popen(mmCommands,
+    finalmmProc = subprocess.Popen(mmCommands,
                               #stdout=subprocess.PIPE,
                               stdin=subprocess.PIPE,
                               #stderr=subprocess.STDOUT,
                               universal_newlines=True)
 
-    print('MM Node http://{}:{}/ - {}'.format(ipAddress, daemonPort, mmProc.returncode))
+    print('Framework: MM Node http://{}:{}/ - Proc {} {}'.format(ipAddress, daemonPort, finalmmProc.pid, finalmmProc.returncode))
 
-    node = networks.Node(ipAddress=ipAddress, nodeProc=mmProc, daemonPort=daemonPort, inputDir=inputDir)
+    node = networks.Node(ipAddress=ipAddress, nodeProc=finalmmProc, daemonPort=daemonPort, inputDir=inputDir)
 
     return node, '100.64.0.1'
 

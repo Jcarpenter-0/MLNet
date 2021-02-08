@@ -12,8 +12,8 @@ import sys
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 import networks.mahimahi
-import networks.common
-import exps.common
+import networks
+import exps
 
 # Have a fixed environment, and see how the nodes behave when running together, apart, and similar for training
 
@@ -55,14 +55,14 @@ def TrainTogether():
     iperfServerNode = networks.mahimahi.SetupMahiMahiNode([mmEnv], dirOffset=DirOffset)
 
     iperfClientNode.AddApplication(
-        ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+        ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
             , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
          '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerTogether1.LearnerPort)])
 
     iperfServerNode.AddApplication(['iperf3', '-s'])
 
     iperfClientNode.AddApplication(
-        ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+        ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
             , '-c', '{}'.format(iperfServerNode.IpAddress), '-p', '5202', '-t', '{}'.format(IperfRunLength),
          '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerTogether2.LearnerPort)])
 
@@ -96,7 +96,7 @@ def TrainAlone():
         iperfServerNode = networks.mahimahi.SetupMahiMahiNode([mmEnv], dirOffset=DirOffset)
 
         iperfClientNode.AddApplication(
-            ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+            ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                 , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
              '{}'.format(IperfRunCount), 'http://localhost:{}'.format(learner.LearnerPort)])
 
@@ -136,12 +136,12 @@ def TestTogether():
 
         iperfClientNode.AddApplication(
             ['python3',
-             '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+             '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                 , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
              '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerTogether1.LearnerPort)])
 
         iperfClientNode.AddApplication(
-            ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+            ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                 , '-c', '{}'.format(iperfServerNode.IpAddress), '-p', '5202', '-t', '{}'.format(IperfRunLength),
              '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerTogether2.LearnerPort)])
 
@@ -175,12 +175,12 @@ def TestTogether():
 
         iperfClientNode.AddApplication(
             ['python3',
-             '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+             '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                 , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
              '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerAlone1.LearnerPort)])
 
         iperfClientNode.AddApplication(
-            ['python3', '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+            ['python3', '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                 , '-c', '{}'.format(iperfServerNode.IpAddress), '-p', '5202', '-t', '{}'.format(IperfRunLength),
              '{}'.format(IperfRunCount), 'http://localhost:{}'.format(ccLearnerAlone2.LearnerPort)])
 
@@ -214,7 +214,7 @@ def TestTogether():
 
             iperfClientNode.AddApplication(
                 ['python3',
-                 '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                 '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                     , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
                  '{}'.format(IperfRunCount), 'http://localhost:{}'.format(verifyLearner1.LearnerPort)])
 
@@ -222,7 +222,7 @@ def TestTogether():
 
             iperfClientNode.AddApplication(
                 ['python3',
-                 '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                 '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                     , '-c', '{}'.format(iperfServerNode.IpAddress), '-p', '5202', '-t', '{}'.format(IperfRunLength),
                  '{}'.format(IperfRunCount), 'http://localhost:{}'.format(verifyLearner2.LearnerPort)])
 
@@ -272,7 +272,7 @@ def TestAlone():
 
             iperfClientNode.AddApplication(
                 ['python3',
-                 '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                 '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                     , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
                  '{}'.format(IperfRunCount), 'http://localhost:{}'.format(learner.LearnerPort)])
 
@@ -303,7 +303,7 @@ def TestAlone():
 
             iperfClientNode.AddApplication(
                 ['python3',
-                 '{}applications/Iperf/experiment_02_congestion_control_micro/iperf_stub.py'.format(DirOffset)
+                 '{}applications/Iperf/02_cc_manager/iperf_stub.py'.format(DirOffset)
                     , '-c', '{}'.format(iperfServerNode.IpAddress), '-t', '{}'.format(IperfRunLength),
                  '{}'.format(IperfRunCount), 'http://localhost:{}'.format(verifyLearner1.LearnerPort)])
 

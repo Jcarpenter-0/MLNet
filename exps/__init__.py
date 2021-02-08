@@ -1,4 +1,5 @@
 import time
+import datetime
 
 
 def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCooldown:int=5, keyboardInterupRaise:bool=True):
@@ -18,13 +19,17 @@ def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCo
     # calulate meta info
     testDurationInSeconds = testDuration + (len(networkModule.Nodes) * appNodeServerCooldown)
 
-    print('Experimental Run: ~{} hour(s)'.format(testDurationInSeconds/60/60))
+    print('Test: ~{} hour(s)'.format(testDurationInSeconds/60/60))
 
     try:
-
+        setupStart = datetime.datetime.now()
+        print('Test: Setup started: {}'.format(setupStart))
         time.sleep(appNodeServerCooldown)
 
         networkModule.StartNodes(interNodeDelay=appNodeServerCooldown)
+
+        testBegin = datetime.datetime.now()
+        print('Test: Setup complete: {} | Setup delay(ms) {}'.format(testBegin, (testBegin - setupStart).seconds * 1000))
 
         # Wait for whole test
         time.sleep(testDuration)
@@ -34,9 +39,9 @@ def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCo
     except Exception as ex:
         print(str(ex))
     finally:
-        # Stop apps
-        print('Stopping Apps')
+        # Stop Applications on the nodes
         networkModule.StopNodes(interNodeDelay=appNodeServerCooldown)
-        print('Experiment Done')
+
+        print('Test Complete {}'.format(datetime.datetime.now()))
         if keyboardInterupRaise and keyBoardInterupted:
             raise KeyboardInterrupt

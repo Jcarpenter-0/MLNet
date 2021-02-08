@@ -14,6 +14,31 @@ sys.path.insert(0, DirOffset)
 
 import apps
 
+
+def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfLogFileName:str=None) -> list:
+
+    iperfCommands = ['-c', targetIPaddress]
+
+    if parallelTCPConnections is not None:
+        iperfCommands.append('-P')
+        iperfCommands.append(parallelTCPConnections)
+
+    if runDuration is not None:
+        iperfCommands.append('-t')
+        iperfCommands.append(runDuration)
+
+    if congestionControl is not None:
+        iperfCommands.append('-C')
+        iperfCommands.append(congestionControl)
+
+    if iperfLogFileName is not None:
+        iperfCommands.append('--logfile')
+        iperfCommands.append(iperfLogFileName)
+
+    commands = apps.PrepWrapperCall('{}apps/Iperf3.py'.format(DirOffset), iperfCommands, iperfRunTimes, 'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    return commands
+
+
 def DefineMetrics() -> dict:
     """Defines what metrics this application provides. Result is dict with metric name and metric info."""
     metricDict = dict()
@@ -100,7 +125,7 @@ def ParseOutput(rawData:bytes) -> dict:
     dataDict['port'] = startSection['connecting_to']['port']
     dataDict['version'] = startSection['version']
     dataDict['system_info'] = startSection['system_info']
-    dataDict['time'] = startSection['timestamp']['time']
+    dataDict['time'] = "{}".format(startSection['timestamp']['time'])
     dataDict['timesecs'] = startSection['timestamp']['timesecs']
     dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
 

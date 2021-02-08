@@ -1,9 +1,16 @@
-# Simply generate a bunch of mahimahi traces files
+if __name__ == '__main__':
+    # Setup the dir
+    DirOffset = '../../'
 
+    import os
+    import sys
+    sys.path.insert(0, os.getcwd())
+    sys.path.insert(0, DirOffset)
+import networks.mahimahi
 import random
 
 TracePath = './mahimahi-traces/'
-TracefileNames = '{}-mm-trace.txt'
+TracefileNames = 'trace-{}-mm-trace.txt'
 NumberOfFiles = range(0, 100)
 LengthsOfTraceFiles = range(1, 100)
 DeliveryDensities = range(0, 100)

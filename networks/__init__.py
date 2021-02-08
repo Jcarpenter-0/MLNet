@@ -41,14 +41,15 @@ class NetworkModule(object):
 
         # iterate over network procs to shut them down
         for proc in self.NetworkProcs:
-            proc.terminate()
+            print('Framework: Killing Network Proc {}'.format(proc.pid))
+            proc.kill()
             try:
                 proc.wait(killTimeout)
             except Exception as timeout:
                 proc.kill()
                 proc.wait()
-            finally:
-                print('Network Shutdown')
+
+        print('Framework: Network Shutdown')
 
 
 class Node(object):
@@ -84,7 +85,7 @@ class Node(object):
 
             if self.InputDir is not None:
                 # no IP or daemon, send data to proc (assuming the file IO based on)
-                print('Application: {} to process via file io {}'.format(applicationArgs, self.InputDir))
+                print('Framework: Application: {} to process via file io {}'.format(applicationArgs, self.InputDir))
 
                 cmdLine = ''
 
@@ -98,7 +99,7 @@ class Node(object):
 
                 inputFP = open(inputFilePath, 'w')
 
-                inputFP.write(cmdLine)
+                inputFP.write(cmdLine + '\n')
 
                 inputFP.flush()
                 inputFP.close()
@@ -112,16 +113,16 @@ class Node(object):
                 jsonBody = json.dumps(writeDict).encode()
 
                 # send to the host server to start the application
-                print('Application: {} to http://{}:{}/'.format(writeDict, self.IpAddress, self.DaemonPort))
+                print('Framework: Application: {} to http://{}:{}/'.format(writeDict, self.IpAddress, self.DaemonPort))
 
                 response = requests.post('http://{}:{}/processStart/'.format(self.IpAddress, self.DaemonPort),
                                          data=jsonBody)
 
                 if response.ok is False:
-                    raise Exception("Problem raising process on node {} : {}".format(self.IpAddress, response.text))
+                    raise Exception("Framework: Problem raising process on node {} : {}".format(self.IpAddress, response.text))
 
             else:
-                raise Exception('Node {} has no daemon'.format(self.IpAddress))
+                raise Exception('Framework: Node {} has no daemon'.format(self.IpAddress))
 
             time.sleep(interApplicationDelay)
 
@@ -134,20 +135,18 @@ class Node(object):
                 # Send "stop" via daemon
                 target = 'http://{}:{}/processStop/'.format(self.IpAddress, self.DaemonPort)
 
-                print('Application Stop to {}'.format(target))
+                print('Framework: Application Stop to {}'.format(target))
 
                 response = requests.post(target)
 
                 if response.ok is False:
-                    raise Exception('Could not stop process on node')
+                    raise Exception('Framework: Could not stop process on node')
 
             elif self.NodeProc is not None and self.InputDir is not None:
 
                 inputFilePath = self.InputDir + 'input.txt'
 
-                print('Application Stop to {}'.format(inputFilePath))
-
-                cmdLine = 'STOP'
+                cmdLine = 'STOP\n'
 
                 inputFP = open(inputFilePath, 'w')
 
@@ -156,28 +155,54 @@ class Node(object):
                 inputFP.flush()
                 inputFP.close()
 
+                print('Framework: Application Stop to {}'.format(inputFilePath))
+                # basic read delay
+                time.sleep(2)
+
         except Exception as ex:
             print(ex)
 
     def ShutdownNode(self, killTimeout=2):
         """Completely shutter this node"""
         self.StopApplications()
-        print('Shutting down node {}'.format(self.IpAddress))
-        if self.NodeProc is not None:
 
+        if self.NodeProc is not None:
             try:
-                self.NodeProc.terminate()
+                if self.InputDir:
+                    # write the daemon Proc exit command
+                    inputFilePath = self.InputDir + 'input.txt'
+
+                    print('Framework: Node Shutdown to {}'.format(inputFilePath))
+
+                    cmdLine = 'EXIT\n'
+
+                    inputFP = open(inputFilePath, 'w')
+
+                    inputFP.write('{}'.format(cmdLine))
+
+                    inputFP.flush()
+                    inputFP.close()
+
+                    # Read delay
+                    time.sleep(2)
+
+                self.NodeProc.kill()
                 self.NodeProc.wait(killTimeout)
             except Exception as timeout:
                 self.NodeProc.kill()
                 self.NodeProc.wait()
 
-            print('{} shutdown'.format(self.IpAddress))
+            print('Framework: Node {} proc {} - {} shutdown'.format(self.IpAddress, self.NodeProc.pid, self.NodeProc.returncode))
         else:
-            print('{} has no proc, but is called to shutdown'.format(self.IpAddress))
+            print('Framework: Node {} has no proc, but is called to shutdown'.format(self.IpAddress))
+
+        # remove input dir if one exists
+        if self.InputDir is not None:
+            shutil.rmtree(self.InputDir)
+            print('Framework: Node {} input tree removed'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/'):
+def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/') -> Node:
 
     # run daemon server
     if daemonServerPort is not None:
@@ -188,7 +213,7 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=No
             os.makedirs(inputDir)
         except Exception as ex:
             # erase the existing dirs and remake them
-            print('Exception making dirs, attempting remake')
+            print('{}'.format(ex))
             shutil.rmtree(inputDir)
             os.makedirs(inputDir)
 
@@ -200,6 +225,6 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=No
     #stderr=subprocess.STDOUT,
     universal_newlines=True)
 
-    print('Localhost node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
+    print('Framework: Localhost Node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
 
     return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc)

@@ -45,7 +45,7 @@ def ParseDefaultServerArgs():
     if len(sys.argv) >= 6:
         miscArgs = sys.argv[6:]
 
-    print('Server args: {} {} {} {} {} {}'.format(port, learnerAddress, mode, learnerDir, traceFilePostFix, miscArgs))
+    print('Learner: Server args: {} {} {} {} {} {}'.format(port, learnerAddress, mode, learnerDir, traceFilePostFix, miscArgs))
 
     return port, learnerAddress, mode, learnerDir, traceFilePostFix, miscArgs
 

@@ -37,8 +37,10 @@ sysctl net.ipv4.tcp_available_congestion_control
 echo "Current Congestion Control"
 sysctl net.ipv4.tcp_congestion_control
 
-# Setup MahiMahi Forwarding
 sudo sysctl -w net.ipv4.ip_forward=1
 
-# Run Experiment Setup
-python3 experiment_02_2_nodes.py
+sudo rm -r ./tmp/*
+
+mkdir -m 777 ./tmp/
+
+python3 mlnet-exp.py

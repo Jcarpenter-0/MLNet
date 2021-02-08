@@ -10,14 +10,19 @@ import shutil
 # https://gist.github.com/shreyakupadhyay/84dc75607ec1078aca3129c8958f3683
 # https://techandtrains.com/2013/11/24/mininet-host-talking-to-internet/
 # https://stackoverflow.com/questions/50421826/connecting-mininet-host-to-the-internet
+# http://mininet.org/walkthrough/#interact-with-hosts-and-switches
+# https://pypi.org/project/mininet/
 
 
 class MiniNetTopology:
 
-    def __init__(self, topo:str=None, nodeCount:int=0, switchDensity:int=0):
+    def __init__(self, topo:str=None, nodeCount:int=0, switchDensity:int=0, linkType:str= None, delay:int=None, bandwidth:int=None):
         self.TopoName = topo
         self.NodeCount = nodeCount
         self.SwitchDensity = switchDensity
+        self.Delay = delay
+        self.Bandwidth = bandwidth
+        self.Link = linkType
 
     def GetCLI(self) -> list:
 
@@ -36,13 +41,46 @@ class MiniNetTopology:
 
             cmdList.append(topoArgString)
 
+        if self.Link:
+            cmdList.append('--link')
+
+            linkArgString = '{}'.format(self.Link)
+
+            if self.Bandwidth is not None:
+                linkArgString += ',bw={}'.format(self.Bandwidth)
+
+            if self.Delay is not None:
+                linkArgString += ',delay={}ms'.format(self.Delay)
+
+            cmdList.append(linkArgString)
+
         return cmdList
 
 
-def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/') -> networks.NetworkModule:
+class MiniNetNetworkModule(networks.NetworkModule):
+
+    def __init__(self, networkProcs:list=[], nodes:list=[]):
+        super().__init__(networkProcs, nodes)
+
+    def Shutdown(self, killTimeout=2):
+        """Mininet specific shutdown operation"""
+        # Shutdown each node
+        for node in self.Nodes:
+            node.ShutdownNode(killTimeout)
+
+        # Mininet specifically takes only the "exit" command
+        self.NetworkProcs[0].stdin.write('exit\n')
+        self.NetworkProcs[0].stdin.flush()
+        time.sleep(killTimeout * 2)
+        print('MiniNet shutdown')
+
+
+def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/', excessiveBlanks:int=30) -> networks.NetworkModule:
     """Setup a mininet network"""
 
     mnCommand = topology.GetCLI()
+
+    print('Mininet: {}'.format(mnCommand))
 
     mnProc = subprocess.Popen(mnCommand,
                                   stdout=subprocess.PIPE,
@@ -52,15 +90,27 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
 
     line = ''
 
+    blanksRemaining = excessiveBlanks
+
     # read until end of the setup
     while '*** Starting CLI:' not in line:
         line = mnProc.stdout.readline()
+
+        line = line.lstrip()
+
+        if len(line) == 0:
+            blanksRemaining-=1
+        else:
+            print(line)
+
+        if blanksRemaining <= 0:
+            raise Exception("Something failed in MiniNet")
 
     # get the hosts
     mnProc.stdin.write('nodes\n')
     mnProc.stdin.flush()
 
-    time.sleep(1)
+    time.sleep(.5)
 
     # example output:
     #
@@ -89,7 +139,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
             mnProc.stdin.write("{} ifconfig\n".format(host))
             mnProc.stdin.flush()
 
-            time.sleep(1)
+            time.sleep(.5)
 
             # example output
             # h1-eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
@@ -127,7 +177,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
                 mnProc.stdin.write("{} {} &\n".format(host, daemonCLIArgs))
                 mnProc.stdin.flush()
 
-                time.sleep(1)
+                time.sleep(.5)
 
                 for idx in range(0, 1):
                     li = mnProc.stdout.readline()
@@ -140,7 +190,6 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
                     os.makedirs(hostSpecificDir)
                 except Exception as ex:
                     # erase the existing dirs and remake them
-                    print('Exception making dirs, attempting remake')
                     shutil.rmtree(hostSpecificDir)
                     os.makedirs(hostSpecificDir)
 
@@ -148,12 +197,24 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
                 mnProc.stdin.write('{} {} &\n'.format(host, apps.daemon_process.PrepareDaemonCLI(daemonServerWatchFilePath=hostSpecificDir, dirOffset=dirOffset)))
                 mnProc.stdin.flush()
                 # Read for backgrounding
-                output = mnProc.stdout.readline()
-                print(output)
+                print('MiniNet: Waiting for MN to "background" a component, about 2 seconds')
+                time.sleep(2)
+
+                # Send control Echo
+                mnProc.stdin.write('sh echo CND--!!\n')
+                mnProc.stdin.flush()
+                time.sleep(.5)
+
+                controlLine = ''
+
+                while 'CND--!!' not in controlLine:
+                    output = mnProc.stdout.readline()
+                    controlLine = output
+                    print(output)
 
             nodes.append(networks.Node(ipAddress=ipAddress, daemonPort=port, inputDir=hostSpecificDir))
 
-    return networks.NetworkModule(networkProcs=[mnProc], nodes=nodes)
+    return MiniNetNetworkModule(networkProcs=[mnProc], nodes=nodes)
 
 
 if __name__ == '__main__':

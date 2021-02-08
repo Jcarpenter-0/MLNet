@@ -79,8 +79,9 @@ class __iperfApplicationModuleRegister(__applicationModuleRegister):
             iperfClientArgs.append(setupArgs['parallel connections'])
 
         serverArg = ['iperf', '-s', '-i', '0']
-        clientArg = apps.PrepWrapperCall('{}apps/Iperf.py'.format(dirOffset), iperfClientArgs, 100000, 'http://{}:{}'.format(learner.LearnerAddress, learner.LearnerPort))
+        clientArg = apps.PrepWrapperCall('{}apps/Iperf.py'.format(dirOffset), iperfClientArgs, 100000, 'http://{}:{}'.format(firstNode.IpAddress, learner.LearnerPort))
 
+        firstNode.AddApplication(learner.ToArgs())
         firstNode.AddApplication(serverArg)
         lastNode.AddApplication(clientArg)
 
@@ -109,8 +110,9 @@ class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
 
         serverArg = ['iperf3', '-s', '-i', '0']
         clientArg = apps.PrepWrapperCall('{}apps/Iperf3.py'.format(dirOffset), iperfClientArgs, 100000,
-                                         'http://{}:{}'.format(learner.LearnerAddress, learner.LearnerPort))
+                                         'http://{}:{}'.format(firstNode.IpAddress, learner.LearnerPort))
 
+        firstNode.AddApplication(learner.ToArgs())
         firstNode.AddApplication(serverArg)
         lastNode.AddApplication(clientArg)
 
@@ -134,7 +136,7 @@ class __pingApplicationModuleRegister(__applicationModuleRegister):
         pingArgs = ['~dest', firstNode.IpAddress, '-c', pingAmount, '-s', packetSize, '-t', '255']
 
         clientArg = apps.PrepWrapperCall('{}apps/Ping.py'.format(dirOffset), pingArgs, 100000,
-                                         'http://{}:{}'.format(learner.LearnerAddress, learner.LearnerPort))
+                                         'http://{}:{}'.format(firstNode.IpAddress, learner.LearnerPort))
 
         lastNode.AddApplication(clientArg)
 

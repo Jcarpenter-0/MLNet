@@ -12,7 +12,7 @@ import networks.mahimahi
 import networks
 import apps
 import apps.Ping
-import learners.common
+import learners
 
 TrainingCount = 4
 
@@ -37,7 +37,7 @@ for trainCount in range(0, TrainingCount):
     # Define Learners
     print('Training count {}'.format(trainCount))
 
-    pingManager = learners.common.Learner('../../learners/example_ping_manager/ping_manager.py'
+    pingManager = learners.Learner('../../learners/example_ping_manager/ping_manager.py'
                                       , traceFilePostFix='trn-{}'.format(trainCount))
 
     # Define network nodes
@@ -51,12 +51,12 @@ for trainCount in range(0, TrainingCount):
 
 
     # run experiment - training
-    exps.runExperimentUsingFramework([pingNode], [pingManager], TestDuration)
+    exps.runExperimentUsingFramework([pingNode], TestDuration)
 
 print('Doing Learner Testing')
 
 # run experiment - testing
-pingManager = learners.common.Learner('../../learners/example_ping_manager/ping_manager.py'
+pingManager = learners.Learner('../../learners/example_ping_manager/ping_manager.py'
                                   , training=0
                                   , traceFilePostFix='tst')
 
@@ -68,17 +68,17 @@ pingNode.AddApplication(apps.PrepWrapperCall(PingPath
                                                     , PingRuns
                                                     , 'http://100.64.0.1:{}'.format(pingManager.LearnerPort)))
 
-exps.runExperimentUsingFramework([pingNode], [pingManager], TestDuration)
+exps.runExperimentUsingFramework([pingNode], TestDuration)
 
 print('Doing Verification')
 
 # run the verification exps
-pingManagerVerificationLowEnd = learners.common.Learner('../../learners/example_ping_manager/ping_manager.py'
+pingManagerVerificationLowEnd = learners.Learner('../../learners/example_ping_manager/ping_manager.py'
                                                     , training=2
                                                     , miscArgs=['./pattern-0.csv']
                                                     , traceFilePostFix='lowEnd')
 
-pingManagerVerificationHighEnd = learners.common.Learner('../../learners/example_ping_manager/ping_manager.py'
+pingManagerVerificationHighEnd = learners.Learner('../../learners/example_ping_manager/ping_manager.py'
                                                      , training=2
                                                      , miscArgs=['./pattern-1.csv']
                                                      , traceFilePostFix='highEnd')
@@ -96,4 +96,4 @@ for verifier in verifications:
                                                         , 'http://100.64.0.1:{}'.format(pingManager.LearnerPort)))
 
     # run experiment
-    exps.runExperimentUsingFramework([pingNode], [verifier], TestDuration)
+    exps.runExperimentUsingFramework([pingNode], TestDuration)

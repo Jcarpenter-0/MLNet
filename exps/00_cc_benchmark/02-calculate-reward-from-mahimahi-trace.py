@@ -9,11 +9,11 @@ if __name__ == '__main__':
     sys.path.insert(0, DirOffset)
 
 import pandas as pd
-import networks.mahimahi
 import math
+import numpy as np
 
 
-dataDF = pd.read_csv('./data/up-log.csv')
+dataDF = pd.read_csv('./tmp/mm-vegas-iperf3-up-log-trunc.csv')
 
 observedMinRTT = 0x3fffffff
 oldObservation = None
@@ -38,6 +38,11 @@ def getReward(obs):
 # group every n numbers into groups then get the average of them
 rewards = []
 
+groupSize = 10
+groupAverages = []
+group = []
+count = 0
+
 for row in dataDF.iterrows():
 
     row = row[1]
@@ -45,14 +50,34 @@ for row in dataDF.iterrows():
     if row['delay(ms)'] < observedMinRTT:
         observedMinRTT = row['delay(ms)']
 
+    reward = 0
+
     if oldObservation is not None:
-        rewards.append(getReward(oldObservation))
-    else:
-        rewards.append(0)
+        reward = getReward(oldObservation)
+
+    rewards.append(reward)
 
     oldObservation = row
 
+    # handle the grouping
+    count += 1
+
+    if count <= groupSize:
+        # add to group
+        group.append(reward)
+    else:
+        # add to next group
+        groupAverages.append(np.mean(group))
+        group = [reward]
+        count = 0
+
+if count > 0:
+    # deal with rest
+    groupAverages.append(np.mean(group))
+
 print('Ready for DF')
 rewardsAggDf = pd.DataFrame(columns=['Reward'], data=rewards)
+rewardsAggDf.to_csv('./tmp/reward-only.csv'.format(), index=None)
 
-rewardsAggDf.to_csv('./data/reward-only-groups.csv'.format(), index=None)
+rewardGroupedDF = pd.DataFrame(columns=['Reward'], data=groupAverages)
+rewardGroupedDF.to_csv('./tmp/reward-only-group-{}.csv'.format(groupSize), index=None)

@@ -24,7 +24,6 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
         super().__init__(loggingDirPath
                          , traceFilePostFix=traceFilePostFix
                          , observationFields=[
-                                'transferred_bytes',
                                 'bits_per_second'
                                 ]
                          , actions={
