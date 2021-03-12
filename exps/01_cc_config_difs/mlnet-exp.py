@@ -22,7 +22,8 @@ import exps
 # Compare the results of this experiment to the results of the benchmark experiment
 # Specifically compare the metrics provided by X across the environments
 
-testDuration = 60
+testDuration = 160
+testFloat = testDuration + int(testDuration * 0.25)
 
 try:
 
@@ -52,9 +53,10 @@ try:
 
     network1 = networks.NetworkModule(nodes=[serverNode, node])
 
-    exps.runExperimentUsingFramework(network1, testDuration * 2)
+    exps.runExperimentUsingFramework(network1, testFloat)
 
     network1.Shutdown()
+    network1 = None
 
     # MahiMahi Iperf3 Test
     mmShells = list()
@@ -82,9 +84,10 @@ try:
 
     network = networks.NetworkModule(nodes=[serverNode, node])
 
-    exps.runExperimentUsingFramework(network, testDuration * 2)
+    exps.runExperimentUsingFramework(network, testFloat)
 
     network.Shutdown()
+    network = None
 
     # Mininet Iperf
     mnTopo = networks.mininet.MiniNetTopology(linkType='tc', delay=25, bandwidth=48)
@@ -102,9 +105,10 @@ try:
 
     mnNet.Nodes[-1].AddApplication(apps.Iperf.PrepIperfCall(mnNet.Nodes[0].IpAddress, mnNet.Nodes[0].IpAddress, learner.LearnerPort, 1, testDuration, 'vegas'))
 
-    exps.runExperimentUsingFramework(mnNet, testDuration * 2)
+    exps.runExperimentUsingFramework(mnNet, testFloat)
 
     mnNet.Shutdown()
+    mnNet = None
 
     # MiniNet Iperf3 Test
 
@@ -123,9 +127,10 @@ try:
 
     mnNet.Nodes[-1].AddApplication(apps.Iperf3.PrepIperfCall(mnNet.Nodes[0].IpAddress, mnNet.Nodes[0].IpAddress, learner.LearnerPort, 1, testDuration, 'vegas'))
 
-    exps.runExperimentUsingFramework(mnNet, testDuration * 2)
+    exps.runExperimentUsingFramework(mnNet, testFloat)
 
     mnNet.Shutdown()
+    mnNet = None
 
 except Exception as ex:
     print(ex)
@@ -147,4 +152,4 @@ finally:
             network1.Shutdown()
     except:
         pass
-    print('Networks shutdown')
+    print('Test: Networks shutdown')

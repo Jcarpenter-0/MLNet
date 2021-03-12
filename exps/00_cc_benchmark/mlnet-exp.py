@@ -29,10 +29,10 @@ node, baseAddress = networks.mahimahi.SetupMahiMahiNode(mmShells, dirOffset=DirO
 
 serverNode = networks.SetupLocalHost(ipAddress=baseAddress)
 
-learner = learners.Learner('{}./learners/congestion_control_manager/congestion_control_manager.py'.format(DirOffset)
+learner = learners.Learner('{}./learners/logging_only_manager/logging_only_manager.py'.format(DirOffset)
                 , training=2
                 , traceFilePostFix='pattern-{}'.format('vegas')
-                , miscArgs=['./input-patterns-vegas-pattern.csv'])
+                , miscArgs=['./input-s-vegas-pattern.csv'])
 
 serverNode.AddApplication(learner.ToArgs())
 serverNode.AddApplication(['iperf', '-s'])

@@ -39,4 +39,9 @@ sysctl net.ipv4.tcp_congestion_control
 
 sudo sysctl -w net.ipv4.ip_forward=1
 
-python3 exp.py
+python3 mlnet-exp.py
+# Post test data processing
+
+python3 01-aggregate-mahimahi-traces.py ./vegas-up-log
+
+python3 02-calculate-reward-from-mahimahi-trace.py ./tmp/vegas-up-log.csv'

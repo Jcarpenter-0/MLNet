@@ -76,12 +76,40 @@ class kerasActorCritic(learners.MLModule):
             # Predict action probabilities and estimated future rewards
             # from environment state
             action_probs, critic_value = self.model(state)
+            original_action_probs = np.squeeze(action_probs)
             self.critic_value_history.append(critic_value[0, 0])
+
+            # SUBSET SELECTION
+            # If a "subset" of actions is desired, the filtering and recalibration of the probabilities from the model is done here
+
+            if actionSpaceSubset is not None:
+                probs = np.squeeze(action_probs)
+                redisprobs = []
+
+                probSum = 0
+
+                # filter the probs for non-allowed actions out
+                for idx, prob in enumerate(probs):
+                    if idx in actionSpaceSubset:
+                        redisprobs.append(prob)
+                        probSum += prob
+                    else:
+                        redisprobs.append(0)
+
+                # adjust the probs that remain with the new total
+                for idx, prob in enumerate(redisprobs):
+                    redisprobs[idx] = prob / probSum
+
+                print('action probs')
+                print(action_probs)
+                action_probs = tf.convert_to_tensor([redisprobs], dtype=tf.float32)
+
+            # ================
 
             # Sample action from action probability distribution
             action = np.random.choice(self.num_actions, p=np.squeeze(action_probs))
 
-            print('State {} - ActionSpace {} - Action {}'.format(state, np.squeeze(action_probs), action))
+            print('State {} - ActionSpace {} - Original {} - ActionSpace Subset {} - Action {}'.format(state, np.squeeze(action_probs), original_action_probs, actionSpaceSubset, action))
 
             self.action_probs_history.append(tf.math.log(action_probs[0, action]))
 
@@ -150,3 +178,4 @@ class kerasActorCritic(learners.MLModule):
                 self.model.save(self.ModelPath)
 
         return actionSpace[action]
+

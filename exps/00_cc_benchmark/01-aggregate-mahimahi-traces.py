@@ -10,13 +10,19 @@ if __name__ == '__main__':
 
 import networks.mahimahi
 
+inputfilePath = sys.argv[1]
+inputFileName = inputfilePath.split('/')[-1]
+
+outputPath = sys.argv[2]
+
+
 CSVHeaders = ['timestamp(ms)', 'bytes', 'delay(ms)']
 CSVHeaderLine = ','.join(CSVHeaders) + '\n'
 
-up = networks.mahimahi.ParseMMLogFile('./tmp/up-log', 10)
+up = networks.mahimahi.ParseMMLogFile(inputfilePath, 10)
 
 if len(up) > 0:
-    fp = open('./tmp/up-log.csv', 'w')
+    fp = open('{}{}.csv'.format(outputPath, inputFileName), 'w')
 
     fp.write(CSVHeaderLine)
 

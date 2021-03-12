@@ -23,7 +23,7 @@ mdpList.append(lowPerf)
 mdpList.append(ambPerf)
 mdpList.append(higPerf)
 
-dataDF = pd.read_csv('exps/experiment_00_ping_example/tmp/Traces/07-12-2020-13-47-11-trn-1-session-log.csv')
+dataDF = pd.read_csv('exps/0X_ping_example/tmp/Traces/07-12-2020-13-47-11-trn-1-session-log.csv')
 
 _, dataDF['state-id'] = mdp.AnalyzeTrace(dataDF, mdpList)
 

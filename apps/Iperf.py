@@ -115,7 +115,7 @@ def __runIperf3(args:dict) -> dict:
     command = ['iperf']
     command.extend(cmdArgs)
 
-    # Quiet the output for easier parsing
+    # format into csv for easier parsing
     if '-y' not in command:
         command.append('-y')
         command.append('C')
@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     currentArgs = argDict.copy()
 
-    retryCount = 2
+    retryCount = 0
     retriesRemaining = retryCount
     retryDelay = 1
 
@@ -160,17 +160,16 @@ if __name__ == '__main__':
 
                 currentArgs = apps.UpdateArgs(currentArgs, response)
 
-            # Refresh retries
-            retriesRemaining = retryCount
 
             currentRunNum += 1
+
+            # Refresh retries
+            retriesRemaining = retryCount
         except KeyboardInterrupt as inter:
             raise inter
         except subprocess.CalledProcessError as ex:
             exception = True
             print(ex)
-            print(ex.output)
-            print(ex.returncode)
 
         except Exception as ex1:
             exception = True
@@ -180,9 +179,8 @@ if __name__ == '__main__':
 
             if exception and not fullFailure:
 
-                time.sleep(retryDelay)
-
                 if retriesRemaining > 0:
+                    time.sleep(retryDelay)
                     print('Retrying')
                     retriesRemaining = retriesRemaining - 1
                 else:

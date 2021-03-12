@@ -8,11 +8,12 @@ import math
 import learners
 import learners.learnerServer
 import learners.kerasMLs
+import mdp as mdplib
 
 
-class CongestionControlExperimentProblemModule(learners.DomainModule):
+class CongestionControlExperimentProblemModule(learners.MDPModule):
 
-    def __init__(self, loggingDirPath, traceFilePostFix=''):
+    def __init__(self, loggingDirPath, traceFilePostFix):
 
         actionSpace = []
 
@@ -21,10 +22,19 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
         actionSpace.append({'-C': 'vegas'})
         actionSpace.append({'-C': 'reno'})
 
-        super().__init__(loggingDirPath
-                         , traceFilePostFix=traceFilePostFix
-                         , observationFields=[
-                                'sender-bps',
+        # Defining the MDP
+        mdp = []
+
+        # "lower" performance state
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) <= 16], [0]))
+
+        # "ambiguous" performance state
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 17 and self.DefineReward(a, a) <= 19], [0, 1, 2, 3]))
+
+        # "high end" performance state
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 19], [1]))
+
+        super().__init__(loggingDirPath, mdp, traceFilePostFix, observationFields=['sender-bps',
                                 'num_streams',
                                 'blksize',
                                 'duration',
@@ -33,16 +43,14 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
                                 'tcp_mss_default',
                                 'meanRTT',
                                 'minRTT',
-                                'sender-retransmits'
-                                ]
-                         , actions={
+                                'sender-retransmits'], actions={
                                 'cubic': [0,1],
                                 'bbr': [0,1],
                                 'vegas': [0,1],
-                                'reno': [0,1]}
-                         , actionSpace=actionSpace)
+                                'reno': [0,1]}, actionSpace=actionSpace)
 
     def DefineReward(self, observation, rawObservation):
+
         # Copa style reward = log(throughput) - log(delay)/2 - log(lost packets)
 
         # goodput (stated in copa paper, backed by ccp code, backed by park code)
@@ -80,7 +88,9 @@ if __name__ == '__main__':
     # Depending on mode
     if mode == 1 or mode == 0:
         # training/testing
-        mlModule = learners.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.ObservationFields), len(domainDF.ActionSpace))
+
+        # +1 input field, to count the state ID
+        mlModule = learners.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.ObservationFields) + 1, len(domainDF.ActionSpace))
     else:
         # pattern mode, for verification
         pattern = learners.learnerServer.loadPatternFile(miscArgs[0])

@@ -62,7 +62,7 @@ class MiniNetNetworkModule(networks.NetworkModule):
     def __init__(self, networkProcs:list=[], nodes:list=[]):
         super().__init__(networkProcs, nodes)
 
-    def Shutdown(self, killTimeout=2):
+    def Shutdown(self, killTimeout=2, miniNetCooldown=10):
         """Mininet specific shutdown operation"""
         # Shutdown each node
         for node in self.Nodes:
@@ -71,8 +71,9 @@ class MiniNetNetworkModule(networks.NetworkModule):
         # Mininet specifically takes only the "exit" command
         self.NetworkProcs[0].stdin.write('exit\n')
         self.NetworkProcs[0].stdin.flush()
-        time.sleep(killTimeout * 2)
-        print('MiniNet shutdown')
+        print('MiniNet: shutdown')
+        time.sleep(miniNetCooldown)
+        print('MiniNet: Cooled')
 
 
 def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/', excessiveBlanks:int=30) -> networks.NetworkModule:

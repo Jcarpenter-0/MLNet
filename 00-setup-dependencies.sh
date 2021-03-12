@@ -7,6 +7,8 @@
 # Update pip
 # pip install --upgrade pip
 
+sudo apt install python3-dev python3-pip python3-venv
+
 # Install pip3
 sudo apt install python3-pip
 pip3 install --upgrade pip3
@@ -30,3 +32,5 @@ pip3 install --upgrade sklearn
 
 # Install pandas
 pip3 install pandas
+
+pip3 install matplotlib

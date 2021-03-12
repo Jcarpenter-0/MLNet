@@ -241,8 +241,12 @@ class DomainModule(object):
 
 class MDPModule(DomainModule):
 
-    def __init__(self, loggingDirPath, mdp:list):
-        super().__init__(loggingDirPath)
+    def __init__(self, loggingDirPath, mdp:list, traceFilePostFix=''
+                 , observationFields=[]
+                 , actions:dict=dict()
+                 , actionSpace:list=None):
+
+        super().__init__(loggingDirPath=loggingDirPath, traceFilePostFix=traceFilePostFix, observationFields=observationFields, actions=actions, actionSpace=actionSpace)
         self.MDP = mdp
         self.IncomingMetrics = None
 
@@ -256,13 +260,13 @@ class MDPModule(DomainModule):
 
     def DefineObservation(self, observation):
         """Observation is provided by the MDP that defines the states"""
-        self.IncomingMetrics = observation.copy
+        self.IncomingMetrics = observation.copy()
 
         # Get current State based on metrics
         currentState, id = mdp.AnalyzeObservation(observation, self.MDP)
 
         # Add to the observation, state id
-        newObv = observation.copy
+        newObv = super().DefineObservation(observation)
 
         newObv['StateID'] = id
 
@@ -272,7 +276,6 @@ class MDPModule(DomainModule):
 
     def DefineReward(self, observation, rawObservation):
         return NotImplementedError
-
 
 # Basic ML Modules
 

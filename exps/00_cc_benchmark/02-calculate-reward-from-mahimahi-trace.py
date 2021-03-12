@@ -13,7 +13,12 @@ import math
 import numpy as np
 
 
-dataDF = pd.read_csv('./tmp/mm-vegas-iperf3-up-log-trunc.csv')
+mmtracePath = sys.argv[1]
+mmtraceFileName = mmtracePath.split('/')[-1].split('.')[0]
+
+outputPath = sys.argv[2]
+
+dataDF = pd.read_csv(mmtracePath)
 
 observedMinRTT = 0x3fffffff
 oldObservation = None
@@ -77,7 +82,7 @@ if count > 0:
 
 print('Ready for DF')
 rewardsAggDf = pd.DataFrame(columns=['Reward'], data=rewards)
-rewardsAggDf.to_csv('./tmp/reward-only.csv'.format(), index=None)
+rewardsAggDf.to_csv('{}{}-reward-only.csv'.format(outputPath, mmtraceFileName), index=None)
 
 rewardGroupedDF = pd.DataFrame(columns=['Reward'], data=groupAverages)
-rewardGroupedDF.to_csv('./tmp/reward-only-group-{}.csv'.format(groupSize), index=None)
+rewardGroupedDF.to_csv('{}{}-reward-only-group-{}.csv'.format(outputPath, mmtraceFileName, groupSize), index=None)

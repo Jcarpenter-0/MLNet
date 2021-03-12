@@ -111,11 +111,17 @@ def __getCCs() -> list:
     return currentCongestionControlFlavors
 
 
-def ParseOutput(rawData:bytes) -> dict:
+def ParseOutput(rawData:bytes, args:dict) -> dict:
 
     outputRaw = rawData.decode()
 
-    output = json.loads(outputRaw)
+    # get output from the logfile
+    if '--logfile' in args.keys():
+        logFileFP = open(args['--logfile'], 'r')
+        output = json.load(logFileFP)
+        logFileFP.close()
+    else:
+        output = json.loads(outputRaw)
 
     dataDict = dict()
 
@@ -124,7 +130,6 @@ def ParseOutput(rawData:bytes) -> dict:
     dataDict['host'] = startSection['connecting_to']['host']
     dataDict['port'] = startSection['connecting_to']['port']
     dataDict['version'] = startSection['version']
-    dataDict['system_info'] = startSection['system_info']
     dataDict['time'] = "{}".format(startSection['timestamp']['time'])
     dataDict['timesecs'] = startSection['timestamp']['timesecs']
     dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
@@ -168,6 +173,7 @@ def ParseOutput(rawData:bytes) -> dict:
         snd = int(streamSender['max_snd_cwnd'])
         maxSendCWNDs.append(snd)
 
+        # RTTs are in usec (microseconds)
         maxRTT = int(streamSender['max_rtt'])
         maxRTTs.append(maxRTT)
 
@@ -185,6 +191,8 @@ def ParseOutput(rawData:bytes) -> dict:
     dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
     dataDict['min_snd_cwnd'] = int(np.min(maxSendCWNDs))
 
+    dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
+
     return dataDict
 
 
@@ -195,13 +203,28 @@ def __runIperf3(args:dict) -> dict:
     command = ['iperf3']
     command.extend(cmdArgs)
 
-    # Quiet the output for easier parsing
+    # output to Json for easier parsing
     if '-J' not in command:
         command.append('-J')
 
-    outputRaw = subprocess.check_output(command)
+    outputRaw = bytes()
 
-    output = ParseOutput(outputRaw)
+    try:
+        outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as ex:
+        if debug:
+            procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
+            procLogFP.flush()
+    except Exception as ex:
+        if debug:
+            procLogFP.write('Check Error: {}\n'.format(ex))
+            procLogFP.flush()
+
+    if debug:
+        procLogFP.write('OutputRaw: {}\n'.format(outputRaw.decode()))
+        procLogFP.flush()
+
+    output = ParseOutput(outputRaw, currentArgs)
 
     # Add the action args
     output.update(args)
@@ -219,11 +242,17 @@ if __name__ == '__main__':
 
     currentArgs = argDict.copy()
 
-    retryCount = 2
+    retryCount = 3
     retriesRemaining = retryCount
     retryDelay = 1
 
     fullFailure = False
+
+    debug = False
+
+    if debug:
+        procLogFP = open('./node-iperf3-c-log.txt'.format(), 'w')
+        procLogFP.flush()
 
     # run n times, allows the controller to "explore" the environment
     currentRunNum = 0
@@ -232,36 +261,52 @@ if __name__ == '__main__':
         exception = False
 
         try:
+            if debug:
+                procLogFP.write('Pre-Execution done\n'.format())
+                procLogFP.flush()
+
+
+            # check if outputing to log file, if so must do indexing to prevent overwrites
+            if '--logfile' in argDict.keys():
+                currentArgs['--logfile'] = '{}'.format(currentRunNum) + argDict['--logfile']
+
             result = __runIperf3(currentArgs)
 
             if endpoint is not None:
                 response = apps.SendToLearner(result, endpoint, verbose=True)
 
+                if debug:
+                    procLogFP.write('One done: {}\n'.format(result))
+                    procLogFP.flush()
+
                 currentArgs = apps.UpdateArgs(currentArgs, response)
+
+            currentRunNum += 1
 
             # Refresh retries
             retriesRemaining = retryCount
-
-            currentRunNum += 1
         except KeyboardInterrupt as inter:
             raise inter
         except subprocess.CalledProcessError as ex:
             exception = True
-            print(ex)
-            print(ex.output)
-            print(ex.returncode)
+            if debug:
+                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
+                procLogFP.flush()
 
+            print(ex)
         except Exception as ex1:
             exception = True
             fullFailure = True
             print(ex1)
+            if debug:
+                procLogFP.write('{}\n'.format(ex1))
+                procLogFP.flush()
         finally:
 
             if exception and not fullFailure:
 
-                time.sleep(retryDelay)
-
                 if retriesRemaining > 0:
+                    time.sleep(retryDelay)
                     print('Retrying')
                     retriesRemaining = retriesRemaining - 1
                 else:
@@ -269,5 +314,10 @@ if __name__ == '__main__':
                     currentRunNum = runcount
                     raise Exception('Ran out of retries')
             elif fullFailure:
+                currentRunNum = runcount
                 raise Exception('Closed')
+
+    if debug:
+        procLogFP.flush()
+        procLogFP.close()
 

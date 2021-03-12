@@ -44,3 +44,23 @@ sudo rm -r ./tmp/*
 mkdir -m 777 ./tmp/
 
 python3 mlnet-exp.py
+
+# Post test data processing
+
+python3 ../00_cc_benchmark/01-aggregate-mahimahi-traces.py ./tmp/mm-vegas-iperf3-up-log ./tmp/
+python3 ../00_cc_benchmark/01-aggregate-mahimahi-traces.py ./tmp/mm-vegas-iperf-up-log ./tmp/
+
+python3 ../00_cc_benchmark/02-calculate-reward-from-mahimahi-trace.py ./tmp/mm-vegas-iperf3-up-log.csv ./tmp/
+python3 ../00_cc_benchmark/02-calculate-reward-from-mahimahi-trace.py ./tmp/mm-vegas-iperf-up-log.csv ./tmp/
+
+# create trunc files
+python3 ./01a-trunc-group.py ./tmp/mm-vegas-iperf3-up-log.csv ./tmp/mm-vegas-iperf3-up-log-trunc.csv
+python3 ./01a-trunc-group.py ./tmp/mm-vegas-iperf-up-log.csv ./tmp/mm-vegas-iperf-up-log-trunc.csv
+
+# Get rewards for trunc files
+python3 ../00_cc_benchmark/02-calculate-reward-from-mahimahi-trace.py ./tmp/mm-vegas-iperf3-up-log-trunc.csv ./tmp/
+python3 ../00_cc_benchmark/02-calculate-reward-from-mahimahi-trace.py ./tmp/mm-vegas-iperf-up-log-trunc.csv ./tmp/
+
+# create merge file
+python3 ./01b-merge-files.py ./tmp/mm-vegas-iperfs-reward-trunc.csv ./tmp/mm-vegas-iperf-up-log-trunc-reward-only-group-10.csv ./tmp/mm-vegas-iperf3-up-log-trunc-reward-only-group-10.csv
+python3 ./01c-merge-files-tput.py ./tmp/mm-vegas-iperfs-tput-trunc.csv ./tmp/mm-vegas-iperf-up-log-trunc.csv ./tmp/mm-vegas-iperf3-up-log-trunc.csv

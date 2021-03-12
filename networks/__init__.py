@@ -19,7 +19,7 @@ class NetworkModule(object):
         # List of Node objects (real or simulated)
         self.Nodes:list = nodes
 
-    def StartNodes(self, interNodeDelay=0, interApplicationDelay=0):
+    def StartNodes(self, interNodeDelay=0, interApplicationDelay=2):
         """Start all the nodes's applications"""
 
         for node in self.Nodes:
@@ -78,7 +78,7 @@ class Node(object):
 
         self.Applications.append(appArgsCopy)
 
-    def StartApplications(self, interApplicationDelay=0):
+    def StartApplications(self, interApplicationDelay=3):
         """Start the applications on the node"""
 
         for applicationArgs in self.Applications:

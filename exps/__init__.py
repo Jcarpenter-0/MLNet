@@ -2,7 +2,7 @@ import time
 import datetime
 
 
-def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCooldown:int=5, keyboardInterupRaise:bool=True):
+def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCooldown:int=3, interAppDelay:int=2, keyboardInterupRaise:bool=True):
     """
         Outline assumptions here:
         -Daemon server on hosts
@@ -16,20 +16,26 @@ def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCo
 
     keyBoardInterupted = False
 
-    # calulate meta info
-    testDurationInSeconds = testDuration + (len(networkModule.Nodes) * appNodeServerCooldown)
+    # calculate number of apps
+    appCount = 0
 
-    print('Test: ~{} hour(s)'.format(testDurationInSeconds/60/60))
+    for node in networkModule.Nodes:
+        appCount += len(node.Applications)
+
+    # calulate meta info
+    testDurationInSeconds = testDuration + (len(networkModule.Nodes) * appNodeServerCooldown) + (appCount * interAppDelay)
+
+    print('Test: ~{} hour(s) = ~{} second(s)'.format(testDurationInSeconds/60/60, testDurationInSeconds))
 
     try:
         setupStart = datetime.datetime.now()
         print('Test: Setup started: {}'.format(setupStart))
         time.sleep(appNodeServerCooldown)
 
-        networkModule.StartNodes(interNodeDelay=appNodeServerCooldown)
+        networkModule.StartNodes(interNodeDelay=appNodeServerCooldown, interApplicationDelay=interAppDelay)
 
         testBegin = datetime.datetime.now()
-        print('Test: Setup complete: {} | Setup delay(ms) {}'.format(testBegin, (testBegin - setupStart).seconds * 1000))
+        print('Test: Setup complete: {} | Setup delay(ms) {}'.format(testBegin, (testBegin - setupStart).microseconds * 1000))
 
         # Wait for whole test
         time.sleep(testDuration)
