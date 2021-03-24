@@ -20,6 +20,12 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
         actionSpace.append({'-C': 'bbr'})
         actionSpace.append({'-C': 'vegas'})
         actionSpace.append({'-C': 'reno'})
+        actionSpace.append({'-C': 'bic'})
+        actionSpace.append({'-C': 'htcp'})
+        actionSpace.append({'-C': 'illinois'})
+        actionSpace.append({'-C': 'lp'})
+        actionSpace.append({'-C': 'veno'})
+        actionSpace.append({'-C': 'westwood'})
 
         super().__init__(loggingDirPath
                          , traceFilePostFix=traceFilePostFix
@@ -39,6 +45,12 @@ class CongestionControlExperimentProblemModule(learners.DomainModule):
                                 'cubic': [0,1],
                                 'bbr': [0,1],
                                 'vegas': [0,1],
+                                'bic': [0, 1],
+                                'htcp': [0, 1],
+                                'illinois': [0, 1],
+                                'lp': [0, 1],
+                                'veno': [0, 1],
+                                'westwood': [0, 1],
                                 'reno': [0,1]}
                          , actionSpace=actionSpace)
 

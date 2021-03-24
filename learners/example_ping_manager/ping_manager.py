@@ -4,11 +4,11 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, '../../')
 
 import learners.kerasMLs
-import learners.common
+import learners
 import learners.preBuiltLearners
 
 
-class PingExperimentExampleDomainModule(learners.common.DomainModule):
+class PingExperimentExampleDomainModule(learners.DomainModule):
 
     def __init__(self, loggingDirPath, traceFilePostFix=''):
         """Ping experiment domain def, just a simple desire,
@@ -41,7 +41,7 @@ class PingExperimentExampleDomainModule(learners.common.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, training, learnerDir, traceFilePost, miscArgs = learners.common.ParseDefaultServerArgs()
+    port, address, training, learnerDir, traceFilePost, miscArgs = learners.ParseDefaultServerArgs()
 
     # Setup domain definition
     domainDF = PingExperimentExampleDomainModule(learnerDir, traceFilePostFix=traceFilePost)
@@ -57,11 +57,11 @@ if __name__ == '__main__':
         # Load the pattern
         pattern = learners.loadPatternFile(miscArgs[0])
 
-        mlModule = learners.common.PatternModule(pattern)
+        mlModule = learners.PatternModule(pattern)
 
 
     # Declare a server
-    server = learners.common.MLServer(domainDF, mlModule, (address, port))
+    server = learners.MLServer(domainDF, mlModule, (address, port))
 
     # Start the server
     print('Server up at http://localhost:{}'.format(port))

@@ -22,7 +22,7 @@ CSVHeaderLine = ','.join(CSVHeaders) + '\n'
 up = networks.mahimahi.ParseMMLogFile(inputfilePath, 10)
 
 if len(up) > 0:
-    fp = open('{}{}.csv'.format(outputPath, inputFileName), 'w')
+    fp = open('{}{}-agg.csv'.format(outputPath, inputFileName), 'w')
 
     fp.write(CSVHeaderLine)
 

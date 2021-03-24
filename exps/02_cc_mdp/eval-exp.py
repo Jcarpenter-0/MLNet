@@ -33,7 +33,8 @@ try:
             networks.mahimahi.MahiMahiLinkShell(upLinkTraceFilePath='../00_cc_benchmark/mahimahi-traces/const48.mahi'
                                                 , downLinkTraceFilePath='../00_cc_benchmark/mahimahi-traces/const48.mahi'
                                                 , uplinkQueue='droptail', uplinkQueueArgs='packets=400'
-                                                , downlinkQueue='droptail', downlinkQueueArgs='packets=400',))
+                                                , downlinkQueue='droptail', downlinkQueueArgs='packets=400',
+                                                uplinkLogFilePath='./tmp/{}-up-log'.format(patternName)))
 
         node, baseAddress = networks.mahimahi.SetupMahiMahiNode(mmShells, dirOffset=DirOffset)
 

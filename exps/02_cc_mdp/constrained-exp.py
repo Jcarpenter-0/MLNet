@@ -23,7 +23,7 @@ testFloat = testDuration + int(testDuration * 0.25)
 
 try:
 
-    # MahiMahi - Iperf2 Test
+    # MahiMahi - Iperf Test
     mmShells = list()
 
     mmShells.append(networks.mahimahi.MahiMahiDelayShell(25))
@@ -32,15 +32,15 @@ try:
                                             , downLinkTraceFilePath='../00_cc_benchmark/mahimahi-traces/const48.mahi'
                                             , uplinkQueue='droptail', uplinkQueueArgs='packets=400'
                                             , downlinkQueue='droptail', downlinkQueueArgs='packets=400',
-                                            uplinkLogFilePath='./tmp/{}-up-log'.format("mdp")
+                                            uplinkLogFilePath='./tmp/{}-up-log'.format("constrained")
                                             ))
 
     node, baseAddress = networks.mahimahi.SetupMahiMahiNode(mmShells, dirOffset=DirOffset)
 
     serverNode = networks.SetupLocalHost(ipAddress=baseAddress)
 
-    learner = learners.Learner('{}./learners/congestion_control_manager_mdp/congestion_control_manager.py'.format(DirOffset)
-                    , learnerDir='./tmp/mm-iperf-mdp/')
+    learner = learners.Learner('{}./learners/congestion_control_manager_constrained/congestion_control_manager.py'.format(DirOffset)
+                    , learnerDir='./tmp/mm-iperf-constrained/')
 
     serverNode.AddApplication(learner.ToArgs())
     serverNode.AddApplication(['iperf3', '-s'])
