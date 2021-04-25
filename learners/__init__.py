@@ -210,7 +210,16 @@ class DomainModule(object):
         logLine = ''
 
         for index, field in enumerate(obvLog.keys()):
-            logLine += '{}'.format(obvLog[field])
+
+            if isinstance(obvLog[field], list):
+                logLine += '\"{}\"'.format(obvLog[field])
+            elif isinstance(obvLog[field], str):
+                if '[' in obvLog[field] or ']' in obvLog[field]:
+                    logLine += '\"{}\"'.format(obvLog[field])
+                else:
+                    logLine += '{}'.format(obvLog[field])
+            else:
+                logLine += '{}'.format(obvLog[field])
 
             if index < len(obvLog) - 1:
                 logLine += ','

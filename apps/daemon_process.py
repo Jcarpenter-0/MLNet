@@ -52,6 +52,8 @@ if __name__ == '__main__':
     # List of procs that this daemon is in charge of
     procs = []
 
+    print('Daemon Process Going up: {}'.format(os.getcwd()))
+
     # Load the basic args
     fileInputDir = sys.argv[1]
     batchRate = float(sys.argv[2])

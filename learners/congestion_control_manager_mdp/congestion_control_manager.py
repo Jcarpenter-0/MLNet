@@ -31,13 +31,13 @@ class CongestionControlExperimentProblemModule(learners.MDPModule):
         # Defining the MDP
         mdp = []
 
-        # "lower" performance state
+        # "lower" performance state 0
         mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) <= 16.5], [0,1]))
 
-        # "ambiguous" performance state
+        # "ambiguous" performance state 1
         mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 16.5 and self.DefineReward(a, a) <= 19], [0, 1, 2]))
 
-        # "high end" performance state
+        # "high end" performance state 2
         mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 19], [2]))
 
         super().__init__(loggingDirPath, mdp, traceFilePostFix, observationFields=['sender-bps',

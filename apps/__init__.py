@@ -79,7 +79,6 @@ def ParseDefaultArgs():
             try:
                 argDict[lastArg] = int(arg)
             except:
-                pass
                 argDict[lastArg] = arg
 
             lastArg = None

@@ -168,7 +168,7 @@ class Node(object):
 
         if self.NodeProc is not None:
             try:
-                if self.InputDir:
+                if self.InputDir is not None:
                     # write the daemon Proc exit command
                     inputFilePath = self.InputDir + 'input.txt'
 

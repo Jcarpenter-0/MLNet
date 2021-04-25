@@ -15,9 +15,13 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfLogFileName:str=None) -> list:
+def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfLogFileName:str=None, iperfPort:int=None) -> list:
 
     iperfCommands = ['-c', targetIPaddress]
+
+    if iperfPort is not None:
+        iperfCommands.append('-p')
+        iperfCommands.append(iperfPort)
 
     if parallelTCPConnections is not None:
         iperfCommands.append('-P')

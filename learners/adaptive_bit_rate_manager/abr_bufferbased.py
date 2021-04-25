@@ -1,0 +1,85 @@
+import os
+import sys
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, '../../')
+
+import numpy as np
+import learners
+import learners.learnerServer
+
+
+# Some constants from Park and Pensieve's reward functions
+M_IN_K = 1000.0
+VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
+
+
+class BufferBasedDecisionLogic(learners.MLModule):
+
+    def __init__(self):
+        """Implementing the Buffer Based (BB) Adaptive Bit Rate Algorithm: Described and partially copied from: Neural Adaptive Video Streaming with Pensieve"""
+        self.Cushion = 10
+        self.Resevoir = 5
+        super().__init__()
+
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.DomainModule):
+        """Quoting from Pensieve paper: uses a reservoir of 5 seconds and a cushion of 10 seconds,
+         i.e., it selects bitrates with the goal of keeping the buffer occupancy above 5 seconds, and automatically
+         chooses the highest available bitrate if the buffer occupancy exceeds 15 seconds."""
+
+        print(info)
+
+        if info['buffer'] < self.Resevoir:
+            selectedBitRateIndex = 0
+        elif info['buffer'] >= self.Resevoir + self.Cushion:
+            selectedBitRateIndex = len(actionSpace) - 1
+        else:
+            selectedBitRateIndex = (len(actionSpace) - 1) * (info['buffer'] - self.Resevoir) / float(self.Cushion)
+
+        print('Logic Module: Selected Bitrate: {}'.format(selectedBitRateIndex))
+
+        return int(selectedBitRateIndex)
+
+
+class ABRControllerExperimentModule(learners.DomainModule):
+
+    def __init__(self, loggingDirPath, traceFilePostFix=''):
+
+        # Hold the history of some inputs
+        self.history = dict()
+        self.history['last_total_rebuf'] = 0
+        # Default initial bitrate index
+        self.history['last_bit_rate'] = 0
+
+        super().__init__(loggingDirPath
+                         , traceFilePostFix=traceFilePostFix
+                         , actions={'bitRate':[0,1,2,3,4,5]})
+
+    def DefineReward(self, observation, rawObservation):
+        """Reward function as outlined by Park and Pensieve: --linear reward-- """
+        SMOOTH_PENALTY = 1
+        REBUF_PENALTY = 4.3  # 1 sec rebuffering -> this number of Mbps
+
+        print('History {}'.format(self.history))
+
+        rebuffer_time = float(rawObservation['RebufferTime'] - self.history['last_total_rebuf'])
+
+        reward = VIDEO_BIT_RATE[rawObservation['lastquality']] / M_IN_K - REBUF_PENALTY * rebuffer_time / M_IN_K - SMOOTH_PENALTY * np.abs(VIDEO_BIT_RATE[rawObservation['lastquality']] - self.history['last_bit_rate']) / M_IN_K
+
+        self.history['last_bit_rate'] = VIDEO_BIT_RATE[rawObservation['lastquality']]
+        self.history['last_total_rebuf'] = rawObservation['RebufferTime']
+
+        return reward
+
+
+if __name__ == '__main__':
+
+    # Parse the default args
+    port, address, mode, learnerDir, filePostFix, miscArgs = learners.learnerServer.ParseDefaultServerArgs()
+
+    # Setup domain definition
+    domainDF = ABRControllerExperimentModule(learnerDir + 'BB-abr/', traceFilePostFix=filePostFix)
+
+    # Declare a server
+    server = learners.learnerServer.MLServer(domainDF, BufferBasedDecisionLogic(), (address, port))
+
+    server.Run()
