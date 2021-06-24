@@ -43,46 +43,6 @@ def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, pa
     return commands
 
 
-def DefineMetrics() -> dict:
-    """Defines what metrics this application provides. Result is dict with metric name and metric info."""
-    metricDict = dict()
-
-    metricDict['host'] = str
-    metricDict['port'] = int
-    metricDict['version'] = str
-    metricDict['system_info'] = str
-    metricDict['time'] = str
-    metricDict['timesecs'] = int
-    metricDict['tcp_mss_default'] = int
-
-    metricDict['protocol'] = str
-    metricDict['num_streams'] = int
-    metricDict['blksize'] = int
-    metricDict['omit'] = int
-    metricDict['duration'] = int
-    metricDict['bytes'] = int
-    metricDict['blocks'] = int
-    metricDict['reverse'] = int
-
-    metricDict['sender-seconds'] = float
-    metricDict['sender-bytes'] = int
-    metricDict['sender-bps'] = float
-    metricDict['sender-retransmits'] = int
-
-    metricDict['receiver-seconds'] = float
-    metricDict['receiver-bytes'] = float
-    metricDict['receiver-bps'] = float
-
-    metricDict['maxRTT'] = float
-    metricDict['minRTT'] = float
-    metricDict['meanRTT'] = float
-    metricDict['max_snd_cwnd'] = float
-    metricDict['avg_snd_cwnd'] = float
-    metricDict['min_snd_cwnd'] = float
-
-    return metricDict
-
-
 def __getCC() -> str:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
@@ -115,136 +75,144 @@ def __getCCs() -> list:
     return currentCongestionControlFlavors
 
 
-def ParseOutput(rawData:bytes, args:dict) -> dict:
+class Iperf3App(apps.App):
 
-    outputRaw = rawData.decode()
+    def __init__(self):
+        super().__init__()
 
-    # get output from the logfile
-    if '--logfile' in args.keys():
-        logFileFP = open(args['--logfile'], 'r')
-        output = json.load(logFileFP)
-        logFileFP.close()
-    else:
-        output = json.loads(outputRaw)
+    def __parseOutput(rawData: bytes, args: dict) -> dict:
 
-    dataDict = dict()
+        outputRaw = rawData.decode()
 
-    startSection = output['start']
+        # get output from the logfile
+        if '--logfile' in args.keys():
+            logFileFP = open(args['--logfile'], 'r')
+            output = json.load(logFileFP)
+            logFileFP.close()
+        else:
+            output = json.loads(outputRaw)
 
-    dataDict['host'] = startSection['connecting_to']['host']
-    dataDict['port'] = startSection['connecting_to']['port']
-    dataDict['version'] = startSection['version']
-    dataDict['time'] = "{}".format(startSection['timestamp']['time'])
-    dataDict['timesecs'] = startSection['timestamp']['timesecs']
-    dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
+        dataDict = dict()
 
-    dataDict['protocol'] = startSection['test_start']['protocol']
-    dataDict['num_streams'] = startSection['test_start']['num_streams']
-    dataDict['blksize'] = startSection['test_start']['blksize']
-    dataDict['omit'] = startSection['test_start']['omit']
-    dataDict['duration'] = startSection['test_start']['duration']
-    dataDict['bytes'] = startSection['test_start']['bytes']
-    dataDict['blocks'] = startSection['test_start']['blocks']
-    dataDict['reverse'] = startSection['test_start']['reverse']
+        startSection = output['start']
 
-    endSection = output['end']
+        dataDict['host'] = startSection['connecting_to']['host']
+        dataDict['port'] = startSection['connecting_to']['port']
+        dataDict['version'] = startSection['version']
+        dataDict['time'] = "{}".format(startSection['timestamp']['time'])
+        dataDict['timesecs'] = startSection['timestamp']['timesecs']
+        dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
 
-    sendSection = endSection['sum_sent']
+        dataDict['protocol'] = startSection['test_start']['protocol']
+        dataDict['num_streams'] = startSection['test_start']['num_streams']
+        dataDict['blksize'] = startSection['test_start']['blksize']
+        dataDict['omit'] = startSection['test_start']['omit']
+        dataDict['duration'] = startSection['test_start']['duration']
+        dataDict['bytes'] = startSection['test_start']['bytes']
+        dataDict['blocks'] = startSection['test_start']['blocks']
+        dataDict['reverse'] = startSection['test_start']['reverse']
 
-    dataDict['sender-seconds'] = sendSection['seconds']
-    dataDict['sender-bytes'] = sendSection['bytes']
-    dataDict['sender-bps'] = sendSection['bits_per_second']
-    dataDict['sender-retransmits'] = sendSection['retransmits']
+        endSection = output['end']
 
-    recSection = endSection['sum_received']
+        sendSection = endSection['sum_sent']
 
-    dataDict['receiver-seconds'] = recSection['seconds']
-    dataDict['receiver-bytes'] = recSection['bytes']
-    dataDict['receiver-bps'] = recSection['bits_per_second']
+        dataDict['sender-seconds'] = sendSection['seconds']
+        dataDict['sender-bytes'] = sendSection['bytes']
+        dataDict['sender-bps'] = sendSection['bits_per_second']
+        dataDict['sender-retransmits'] = sendSection['retransmits']
 
-    # Stream dissection
-    streamSection = endSection['streams']
+        recSection = endSection['sum_received']
 
-    minRTTs = []
-    maxRTTs = []
-    avgRTTs = []
+        dataDict['receiver-seconds'] = recSection['seconds']
+        dataDict['receiver-bytes'] = recSection['bytes']
+        dataDict['receiver-bps'] = recSection['bits_per_second']
 
-    maxSendCWNDs = []
+        # Stream dissection
+        streamSection = endSection['streams']
 
-    for stream in streamSection:
-        streamSender = stream['sender']
+        minRTTs = []
+        maxRTTs = []
+        avgRTTs = []
 
-        snd = int(streamSender['max_snd_cwnd'])
-        maxSendCWNDs.append(snd)
+        maxSendCWNDs = []
 
-        # RTTs are in usec (microseconds)
-        maxRTT = int(streamSender['max_rtt'])
-        maxRTTs.append(maxRTT)
+        for stream in streamSection:
+            streamSender = stream['sender']
 
-        minRTT = int(streamSender['min_rtt'])
-        minRTTs.append(minRTT)
+            snd = int(streamSender['max_snd_cwnd'])
+            maxSendCWNDs.append(snd)
 
-        meanRTT = int(streamSender['mean_rtt'])
-        avgRTTs.append(meanRTT)
+            # RTTs are in usec (microseconds)
+            maxRTT = int(streamSender['max_rtt'])
+            maxRTTs.append(maxRTT)
 
-    # Calculate macros
-    dataDict['maxRTT'] = float(np.mean(maxRTTs))
-    dataDict['minRTT'] = float(np.mean(minRTTs))
-    dataDict['meanRTT'] = float(np.mean(avgRTTs))
-    dataDict['max_snd_cwnd'] = int(np.max(maxSendCWNDs))
-    dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
-    dataDict['min_snd_cwnd'] = int(np.min(maxSendCWNDs))
+            minRTT = int(streamSender['min_rtt'])
+            minRTTs.append(minRTT)
 
-    dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
+            meanRTT = int(streamSender['mean_rtt'])
+            avgRTTs.append(meanRTT)
 
-    return dataDict
+        # Calculate macros
+        dataDict['maxRTT'] = float(np.mean(maxRTTs))
+        dataDict['minRTT'] = float(np.mean(minRTTs))
+        dataDict['meanRTT'] = float(np.mean(avgRTTs))
+        dataDict['max_snd_cwnd'] = int(np.max(maxSendCWNDs))
+        dataDict['avg_snd_cwnd'] = float(np.mean(maxSendCWNDs))
+        dataDict['min_snd_cwnd'] = int(np.min(maxSendCWNDs))
 
+        dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
 
-def __runIperf3(args:dict) -> dict:
+        return dataDict
 
-    cmdArgs = apps.ToPopenArgs(args)
+    def Run(self, runArgs:dict) -> dict:
 
-    command = ['iperf3']
-    command.extend(cmdArgs)
+        # check if outputing to log file, if so must do indexing to prevent overwrites
+        if '--logfile' in argDict.keys():
+            currentArgs['--logfile'] = '{}'.format(currentRunNum) + argDict['--logfile']
 
-    # output to Json for easier parsing
-    if '-J' not in command:
-        command.append('-J')
+        warnings = []
 
-    outputRaw = bytes()
+        cmdArgs = apps.ToPopenArgs(runArgs)
 
-    try:
-        outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as ex:
+        command = ['iperf3']
+        command.extend(cmdArgs)
+
+        # output to Json for easier parsing
+        if '-J' not in command:
+            command.append('-J')
+
+        outputRaw = bytes()
+
+        try:
+            outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as ex:
+            if debug:
+                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
+                procLogFP.flush()
+        except Exception as ex:
+            if debug:
+                procLogFP.write('Check Error: {}\n'.format(ex))
+                procLogFP.flush()
+
         if debug:
-            procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
-            procLogFP.flush()
-    except Exception as ex:
-        if debug:
-            procLogFP.write('Check Error: {}\n'.format(ex))
+            procLogFP.write('OutputRaw: {}\n'.format(outputRaw.decode()))
             procLogFP.flush()
 
-    if debug:
-        procLogFP.write('OutputRaw: {}\n'.format(outputRaw.decode()))
-        procLogFP.flush()
+        output = self.__parseOutput(outputRaw, runArgs)
 
-    output = ParseOutput(outputRaw, currentArgs)
+        # Add the action args
+        output.update(runArgs)
 
-    # Add the action args
-    output.update(args)
+        if '-C' not in command:
+            output['-C'] = apps.Iperf3.__getCC()
 
-    if '-C' not in command:
-        output['-C'] = __getCC()
-
-    return output
+        return output
 
 
 # Allow call to just run iperf with initial args
 if __name__ == '__main__':
 
-    argDict, endpoint, runcount = apps.ParseDefaultArgs()
-
-    currentArgs = argDict.copy()
+    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
 
     retryCount = 3
     retriesRemaining = retryCount
@@ -268,7 +236,6 @@ if __name__ == '__main__':
             if debug:
                 procLogFP.write('Pre-Execution done\n'.format())
                 procLogFP.flush()
-
 
             # check if outputing to log file, if so must do indexing to prevent overwrites
             if '--logfile' in argDict.keys():

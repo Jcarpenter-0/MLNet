@@ -190,7 +190,6 @@ class DomainModule(object):
 
         if rawObservation is not None:
             for rawField in rawObservation:
-
                 obvLog['Raw-{}'.format(rawField)] = "\"{}\"".format(rawObservation[rawField])
 
         if self.FirstLogWrite:
@@ -213,11 +212,11 @@ class DomainModule(object):
 
             if isinstance(obvLog[field], list):
                 logLine += '\"{}\"'.format(obvLog[field])
-            elif isinstance(obvLog[field], str):
-                if '[' in obvLog[field] or ']' in obvLog[field]:
-                    logLine += '\"{}\"'.format(obvLog[field])
-                else:
-                    logLine += '{}'.format(obvLog[field])
+            #elif isinstance(obvLog[field], str):
+                #if '[' in obvLog[field] or ']' in obvLog[field]:
+                #    logLine += '\"{}\"'.format(obvLog[field])
+                #else:
+                #    logLine += '{}'.format(obvLog[field])
             else:
                 logLine += '{}'.format(obvLog[field])
 

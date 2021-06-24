@@ -17,8 +17,14 @@ from selenium import webdriver
 
 def PrepCall(url:str, duration:float, runTimes:int, learnerIpAddress:str, learnerPort:int) -> list:
 
-    commands = apps.PrepWrapperCall('{}apps/browser_selenium_chrome/browser_selenium_chrome.py'.format(DirOffset), ['~url', url, '~duration', '{}'.format(duration)], runTimes,
-                                    'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    if learnerIpAddress is not None and learnerPort is not None:
+
+        commands = apps.PrepWrapperCall('{}apps/browser_selenium_chrome/browser_selenium_chrome.py'.format(DirOffset), ['~url', url, '~duration', '{}'.format(duration)], runTimes,
+                                        'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    else:
+        commands = apps.PrepWrapperCall('{}apps/browser_selenium_chrome/browser_selenium_chrome.py'.format(DirOffset),
+                                        ['~url', url, '~duration', '{}'.format(duration)], runTimes, "")
+
     return commands
 
 
@@ -38,7 +44,7 @@ def __run(args:dict) -> dict:
 
     time.sleep(args['~duration'])
 
-    browser.close()
+    browser.quit()
 
     # Parse the output
     result = {}
@@ -50,9 +56,7 @@ def __run(args:dict) -> dict:
 
 if __name__ == '__main__':
 
-    argDict, endpoint, runcount = apps.ParseDefaultArgs()
-
-    currentArgs = argDict.copy()
+    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
 
     # run n times, allows the controller to "explore" the environment
     currentRunNum = 0

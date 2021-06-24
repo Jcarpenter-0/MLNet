@@ -39,21 +39,6 @@ def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, pa
     commands = apps.PrepWrapperCall('{}apps/Iperf.py'.format(DirOffset), iperfCommands, iperfRunTimes, 'http://{}:{}'.format(learnerIpAddress, learnerPort))
     return commands
 
-def DefineMetrics() -> dict:
-    """Defines what metrics this application provides. Result is dict with metric name and metric info."""
-    metricDict = dict()
-
-    metricDict['timestamp'] = float
-    metricDict['source_addr'] = str
-    metricDict['source_port'] = int
-    metricDict['dest_addr'] = str
-    metricDict['dest_port'] = int
-    metricDict['interval'] = int
-    metricDict['transferred_bytes'] = int
-    metricDict['bits_per_second'] = float
-
-    return metricDict
-
 
 def __getCC() -> str:
 
@@ -91,7 +76,10 @@ def ParseOutput(rawData:bytes) -> dict:
 
     outputRaw = rawData.decode()
 
-    output = outputRaw.split(',')
+    outputLines = outputRaw.split('\n')
+
+    # Take the sum line
+    output = outputLines[-2].split(',')
 
     dataDict = dict()
 
@@ -140,9 +128,7 @@ def __runIperf3(args:dict) -> dict:
 # Allow call to just run iperf with initial args
 if __name__ == '__main__':
 
-    argDict, endpoint, runcount = apps.ParseDefaultArgs()
-
-    currentArgs = argDict.copy()
+    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
 
     retryCount = 0
     retriesRemaining = retryCount

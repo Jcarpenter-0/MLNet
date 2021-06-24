@@ -103,9 +103,7 @@ def __runPing(args:dict) -> dict:
 # Allow call to just run iperf with initial args
 if __name__ == '__main__':
 
-    argDict, endpoint, runcount = apps.ParseDefaultArgs()
-
-    currentArgs = argDict.copy()
+    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
 
     # run n times, allows the controller to "explore" the environment
     for runNum in range(0, runcount):

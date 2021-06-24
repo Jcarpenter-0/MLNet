@@ -7,8 +7,10 @@ def UpdateArgs(oldArgs:dict, newArgs:dict):
     """Update the command line args with new args, will replace any matches and add missing"""
     updatedArgs = oldArgs.copy()
 
-    for key in newArgs.keys():
-        updatedArgs[key] = newArgs[key]
+    if isinstance(newArgs, dict):
+
+        for key in newArgs.keys():
+            updatedArgs[key] = newArgs[key]
 
     return updatedArgs
 
@@ -87,11 +89,99 @@ def ParseDefaultArgs():
     runCount = int(sys.argv[-2])
     endPoint = sys.argv[-1]
 
+    probingApproach = None
+
     if len(endPoint) == 0:
         endPoint = None
 
-    return argDict, endPoint, runCount
+    return argDict, argDict.copy(), endPoint, runCount
 
+
+class App(object):
+
+    def __init__(self):
+        """The representation of an application's execution"""
+
+    def Run(self, runArgs:dict) -> (dict, list):
+        """Run the application and return the metrics it has/collects and the warnings."""
+        return NotImplementedError
+
+
+def RunApplication(application:App):
+    """Run an application"""
+
+    argDict, currentArgs, endpoint, runcount = ParseDefaultArgs()
+
+    retryCount = 3
+    retriesRemaining = retryCount
+    retryDelay = 1
+
+    fullFailure = False
+
+    debug = False
+
+    if debug:
+        procLogFP = open('./node-iperf3-c-log.txt'.format(), 'w')
+        procLogFP.flush()
+
+    # run n times, allows the controller to "explore" the environment
+    currentRunNum = 0
+    while(currentRunNum < runcount):
+
+        exception = False
+
+        try:
+
+            application.Run(currentArgs)
+
+            if endpoint is not None:
+                response = apps.SendToLearner(result, endpoint, verbose=True)
+
+                if debug:
+                    procLogFP.write('One done: {}\n'.format(result))
+                    procLogFP.flush()
+
+                currentArgs = apps.UpdateArgs(currentArgs, response)
+
+            currentRunNum += 1
+
+            # Refresh retries
+            retriesRemaining = retryCount
+        except KeyboardInterrupt as inter:
+            raise inter
+        except subprocess.CalledProcessError as ex:
+            exception = True
+            if debug:
+                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
+                procLogFP.flush()
+
+            print(ex)
+        except Exception as ex1:
+            exception = True
+            fullFailure = True
+            print(ex1)
+            if debug:
+                procLogFP.write('{}\n'.format(ex1))
+                procLogFP.flush()
+        finally:
+
+            if exception and not fullFailure:
+
+                if retriesRemaining > 0:
+                    time.sleep(retryDelay)
+                    print('Retrying')
+                    retriesRemaining = retriesRemaining - 1
+                else:
+                    print('Failure')
+                    currentRunNum = runcount
+                    raise Exception('Ran out of retries')
+            elif fullFailure:
+                currentRunNum = runcount
+                raise Exception('Closed')
+
+    if debug:
+        procLogFP.flush()
+        procLogFP.close()
 
 def PrepWrapperCall(commandFilePath:str, args:list, runcount:int, endpoint:str) -> list:
 

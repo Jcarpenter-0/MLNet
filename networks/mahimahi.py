@@ -262,5 +262,63 @@ def ParseMMLogFile(logFilePath:str, timeGrouping:int=0) -> list:
     return outputLines
 
 
+def ParseMacroMMLogFileToData(logFilePath:str, timeGrouping:int=0) -> list:
+    """Parse a mahimahi format trace"""
+
+    fp = open(logFilePath, 'r')
+    logFileLinesRaw = fp.readlines()
+    fp.close()
+
+    baseTimestamp = int(logFileLinesRaw[4].split(':')[-1].lstrip())
+
+    packetLogLines = logFileLinesRaw[6:]
+
+    times = []
+    delays = []
+    sizes = []
+
+    currentGroupStartTS = 0
+    currentGroupSize = 0
+    currentGroupDelays = []
+
+    dataLines = []
+
+    for logLineRaw in packetLogLines:
+
+        logLineRaw = logLineRaw.replace('\n','')
+
+        if '-' in logLineRaw:
+            # Delivery success
+            linePieces = logLineRaw.split(' ')
+
+            packetTimestamp = int(linePieces[0]) - baseTimestamp
+
+            packetSize = int(linePieces[2])
+
+            # packet delay ms
+            packetDelay = int(linePieces[3])
+
+            delays.append(packetDelay)
+            sizes.append(packetSize)
+            times.append(packetTimestamp)
+
+            # in next group?
+            if packetTimestamp >= currentGroupStartTS + timeGrouping and timeGrouping is not 0:
+                # output last group
+                dataLine = {'timestamp(ms)': '{}'.format(currentGroupStartTS), 'bytes': '{}'.format(currentGroupSize),
+                            'delay(ms)': '{}'.format(np.mean(currentGroupDelays))}
+
+                dataLines.append(dataLine)
+
+                currentGroupSize = 0
+                currentGroupDelays = []
+                currentGroupStartTS += timeGrouping
+
+            # in current group
+            currentGroupDelays.append(packetDelay)
+            currentGroupSize += packetSize
+
+    return dataLines
+
 # https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
 # https://stackoverflow.com/questions/22163422/using-python-to-open-a-shell-environment-run-a-command-and-exit-environment

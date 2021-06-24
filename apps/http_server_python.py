@@ -65,9 +65,7 @@ def __run(args:dict) -> dict:
 
 if __name__ == '__main__':
 
-    argDict, endpoint, runcount = apps.ParseDefaultArgs()
-
-    currentArgs = argDict.copy()
+    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
 
     retryCount = 3
     retriesRemaining = retryCount
