@@ -16,7 +16,7 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfPort:int=None) -> list:
+def PrepIperfCall(targetIPaddress:str, agentIPAddress:str=None, agentPort:int=None, probingApproach:int=0, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfPort:int=None) -> list:
 
     iperfCommands = ['-c', targetIPaddress]
 
@@ -36,11 +36,11 @@ def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, pa
         iperfCommands.append('-Z')
         iperfCommands.append(congestionControl)
 
-    commands = apps.PrepWrapperCall('{}apps/Iperf.py'.format(DirOffset), iperfCommands, iperfRunTimes, 'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    commands = apps.PrepWrapperCall('{}apps/Iperf.py'.format(DirOffset), iperfCommands, iperfRunTimes, agentIPAddress, agentPort, probeApproach=probingApproach)
     return commands
 
 
-def __getCC() -> str:
+def getCC() -> str:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
 
@@ -56,7 +56,7 @@ def __getCC() -> str:
     return ccRawPieces
 
 
-def __getCCs() -> list:
+def getCCs() -> list:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_available_congestion_control'])
 
@@ -72,111 +72,62 @@ def __getCCs() -> list:
     return currentCongestionControlFlavors
 
 
-def ParseOutput(rawData:bytes) -> dict:
+class IperfApp(apps.App):
 
-    outputRaw = rawData.decode()
+    def ParseOutput(self, rawData:bytes) -> dict:
 
-    outputLines = outputRaw.split('\n')
+        outputRaw = rawData.decode()
 
-    # Take the sum line
-    output = outputLines[-2].split(',')
+        outputLines = outputRaw.split('\n')
 
-    dataDict = dict()
+        # Take the sum line
+        output = outputLines[-2].split(',')
 
-    if len(outputRaw) <= 0:
-        raise Exception('No Iperf output')
+        dataDict = dict()
 
-    dataDict['timestamp'] = output[0]
-    dataDict['source_addr'] = output[1]
-    dataDict['source_port'] = output[2]
+        if len(outputRaw) <= 0:
+            raise Exception('No Iperf output')
 
-    dataDict['dest_addr'] = output[3]
-    dataDict['dest_port'] = output[4]
+        dataDict['timestamp'] = output[0]
+        dataDict['source_addr'] = output[1]
+        dataDict['source_port'] = output[2]
 
-    dataDict['interval'] = output[6]
-    dataDict['transferred_bytes'] = int(output[7])
-    dataDict['bits_per_second'] = float(output[8])
+        dataDict['dest_addr'] = output[3]
+        dataDict['dest_port'] = output[4]
 
-    return dataDict
+        dataDict['interval'] = output[6]
+        dataDict['transferred_bytes'] = int(output[7])
+        dataDict['bits_per_second'] = float(output[8])
 
+        return dataDict
 
-def __runIperf3(args:dict) -> dict:
+    def Run(self, runArgs:dict) -> (dict, list):
 
-    cmdArgs = apps.ToPopenArgs(args)
+        cmdArgs = apps.ToPopenArgs(runArgs)
 
-    command = ['iperf']
-    command.extend(cmdArgs)
+        command = ['iperf']
+        command.extend(cmdArgs)
 
-    # format into csv for easier parsing
-    if '-y' not in command:
-        command.append('-y')
-        command.append('C')
+        # format into csv for easier parsing
+        if '-y' not in command:
+            command.append('-y')
+            command.append('C')
 
-    outputRaw = subprocess.check_output(command)
+        outputRaw = subprocess.check_output(command)
 
-    output = ParseOutput(outputRaw)
+        output = self.ParseOutput(outputRaw)
 
-    # Add the action args
-    output.update(args)
+        # Add the action args
+        output.update(runArgs)
 
-    if '-Z' not in command:
-        output['-Z'] = __getCC()
+        if '-Z' not in command:
+            output['-Z'] = getCC()
 
-    return output
+        return output
 
 
 # Allow call to just run iperf with initial args
 if __name__ == '__main__':
 
-    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
-
-    retryCount = 0
-    retriesRemaining = retryCount
-    retryDelay = 1
-
-    fullFailure = False
-
-    # run n times, allows the controller to "explore" the environment
-    currentRunNum = 0
-    while(currentRunNum < runcount):
-
-        exception = False
-
-        try:
-            result = __runIperf3(currentArgs)
-
-            if endpoint is not None:
-                response = apps.SendToLearner(result, endpoint)
-
-                currentArgs = apps.UpdateArgs(currentArgs, response)
-
-
-            currentRunNum += 1
-
-            # Refresh retries
-            retriesRemaining = retryCount
-        except KeyboardInterrupt as inter:
-            raise inter
-        except subprocess.CalledProcessError as ex:
-            exception = True
-            print(ex)
-
-        except Exception as ex1:
-            exception = True
-            fullFailure = True
-            print(ex1)
-        finally:
-
-            if exception and not fullFailure:
-
-                if retriesRemaining > 0:
-                    time.sleep(retryDelay)
-                    print('Retrying')
-                    retriesRemaining = retriesRemaining - 1
-                else:
-                    print('Failure')
-                    currentRunNum = runcount
-                    raise Exception('Ran out of retries')
-            elif fullFailure:
-                raise Exception('Closed')
+    apps.RunApplication(IperfApp())
 

@@ -51,3 +51,4 @@ def runExperimentUsingFramework(networkModule, testDuration:int, appNodeServerCo
         print('Test Complete {}'.format(datetime.datetime.now()))
         if keyboardInterupRaise and keyBoardInterupted:
             raise KeyboardInterrupt
+

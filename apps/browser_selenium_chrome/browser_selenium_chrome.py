@@ -28,58 +28,34 @@ def PrepCall(url:str, duration:float, runTimes:int, learnerIpAddress:str, learne
     return commands
 
 
-def __run(args:dict) -> dict:
+class SeleniumChrome(apps.App):
 
-    chromeOptions = webdriver.ChromeOptions()
-    chromeOptions.headless = True
-    chromeOptions.add_argument('--user-data-dir=' + '/tmp/chrome_user_dir')
-    chromeOptions.add_argument('--ignore-certificate-errors')
-    chromeOptions.add_argument("--autoplay-policy=no-user-gesture-required")
+    def Run(self, args:dict) -> dict:
 
-    browser = webdriver.Chrome(executable_path='{}apps/browser_selenium_chrome/chromedriver_linux64/chromedriver'.format(DirOffset), options=chromeOptions)
+        chromeOptions = webdriver.ChromeOptions()
+        chromeOptions.headless = True
+        chromeOptions.add_argument('--user-data-dir=' + '/tmp/chrome_user_dir')
+        chromeOptions.add_argument('--ignore-certificate-errors')
+        chromeOptions.add_argument("--autoplay-policy=no-user-gesture-required")
 
-    start = time.time()
-    browser.get(args['~url'])
-    end = time.time()
+        browser = webdriver.Chrome(executable_path='{}apps/browser_selenium_chrome/chromedriver_linux64/chromedriver'.format(DirOffset), options=chromeOptions)
 
-    time.sleep(args['~duration'])
+        start = time.time()
+        browser.get(args['~url'])
+        end = time.time()
 
-    browser.quit()
+        time.sleep(args['~duration'])
 
-    # Parse the output
-    result = {}
+        browser.quit()
 
-    result['pageLoadTime'] = end-start
+        # Parse the output
+        result = {}
 
-    return result
+        result['pageLoadTime'] = end-start
+
+        return result
 
 
 if __name__ == '__main__':
 
-    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
-
-    # run n times, allows the controller to "explore" the environment
-    currentRunNum = 0
-    while(currentRunNum < runcount):
-
-        exception = False
-
-        try:
-
-            result = __run(currentArgs)
-
-            if endpoint is not None:
-                response = apps.SendToLearner(result, endpoint)
-
-                currentArgs = apps.UpdateArgs(currentArgs, response)
-
-            currentRunNum += 1
-        except KeyboardInterrupt as inter:
-            raise inter
-        except subprocess.CalledProcessError as ex:
-            pass
-        except Exception as ex1:
-            print(ex1)
-            raise ex1
-
-
+    apps.RunApplication(SeleniumChrome())

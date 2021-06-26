@@ -8,6 +8,7 @@ DirOffset = '../../'
 
 import os
 import sys
+
 sys.path.insert(0, os.getcwd())
 sys.path.insert(0, DirOffset)
 # Hack for overcoming some dir issues
@@ -15,7 +16,7 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfLogFileName:str=None, iperfPort:int=None) -> list:
+def PrepIperfCall(targetIPaddress:str, agentIPAddress:str=None, agentPort:int=None, probingApproach:int=0, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfLogFileName:str=None, iperfPort:int=None, dirOffset='./../../') -> list:
 
     iperfCommands = ['-c', targetIPaddress]
 
@@ -39,11 +40,11 @@ def PrepIperfCall(targetIPaddress:str, learnerIpAddress:str, learnerPort:int, pa
         iperfCommands.append('--logfile')
         iperfCommands.append(iperfLogFileName)
 
-    commands = apps.PrepWrapperCall('{}apps/Iperf3.py'.format(DirOffset), iperfCommands, iperfRunTimes, 'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    commands = apps.PrepWrapperCall('{}apps/Iperf3.py'.format(dirOffset), iperfCommands, iperfRunTimes, agentIPAddress, agentPort, probeApproach=probingApproach)
     return commands
 
 
-def __getCC() -> str:
+def getCC() -> str:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
 
@@ -59,7 +60,7 @@ def __getCC() -> str:
     return ccRawPieces
 
 
-def __getCCs() -> list:
+def getCCs() -> list:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_available_congestion_control'])
 
@@ -75,12 +76,13 @@ def __getCCs() -> list:
     return currentCongestionControlFlavors
 
 
+def test():
+
+    return ''
+
 class Iperf3App(apps.App):
 
-    def __init__(self):
-        super().__init__()
-
-    def __parseOutput(rawData: bytes, args: dict) -> dict:
+    def ParseOutput(self, rawData: bytes, args: dict) -> dict:
 
         outputRaw = rawData.decode()
 
@@ -164,13 +166,11 @@ class Iperf3App(apps.App):
 
         return dataDict
 
-    def Run(self, runArgs:dict) -> dict:
+    def Run(self, runArgs:dict) -> (dict, list):
 
         # check if outputing to log file, if so must do indexing to prevent overwrites
-        if '--logfile' in argDict.keys():
-            currentArgs['--logfile'] = '{}'.format(currentRunNum) + argDict['--logfile']
-
-        warnings = []
+        if '--logfile' in runArgs.keys():
+            runArgs['--logfile'] = runArgs['--logfile']
 
         cmdArgs = apps.ToPopenArgs(runArgs)
 
@@ -181,114 +181,21 @@ class Iperf3App(apps.App):
         if '-J' not in command:
             command.append('-J')
 
-        outputRaw = bytes()
+        outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
 
-        try:
-            outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as ex:
-            if debug:
-                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
-                procLogFP.flush()
-        except Exception as ex:
-            if debug:
-                procLogFP.write('Check Error: {}\n'.format(ex))
-                procLogFP.flush()
-
-        if debug:
-            procLogFP.write('OutputRaw: {}\n'.format(outputRaw.decode()))
-            procLogFP.flush()
-
-        output = self.__parseOutput(outputRaw, runArgs)
+        output = self.ParseOutput(outputRaw, runArgs)
 
         # Add the action args
         output.update(runArgs)
 
         if '-C' not in command:
-            output['-C'] = apps.Iperf3.__getCC()
+            output['-C'] = getCC()
 
-        return output
+        return output, []
 
 
 # Allow call to just run iperf with initial args
 if __name__ == '__main__':
 
-    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
-
-    retryCount = 3
-    retriesRemaining = retryCount
-    retryDelay = 1
-
-    fullFailure = False
-
-    debug = False
-
-    if debug:
-        procLogFP = open('./node-iperf3-c-log.txt'.format(), 'w')
-        procLogFP.flush()
-
-    # run n times, allows the controller to "explore" the environment
-    currentRunNum = 0
-    while(currentRunNum < runcount):
-
-        exception = False
-
-        try:
-            if debug:
-                procLogFP.write('Pre-Execution done\n'.format())
-                procLogFP.flush()
-
-            # check if outputing to log file, if so must do indexing to prevent overwrites
-            if '--logfile' in argDict.keys():
-                currentArgs['--logfile'] = '{}'.format(currentRunNum) + argDict['--logfile']
-
-            result = __runIperf3(currentArgs)
-
-            if endpoint is not None:
-                response = apps.SendToLearner(result, endpoint, verbose=True)
-
-                if debug:
-                    procLogFP.write('One done: {}\n'.format(result))
-                    procLogFP.flush()
-
-                currentArgs = apps.UpdateArgs(currentArgs, response)
-
-            currentRunNum += 1
-
-            # Refresh retries
-            retriesRemaining = retryCount
-        except KeyboardInterrupt as inter:
-            raise inter
-        except subprocess.CalledProcessError as ex:
-            exception = True
-            if debug:
-                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
-                procLogFP.flush()
-
-            print(ex)
-        except Exception as ex1:
-            exception = True
-            fullFailure = True
-            print(ex1)
-            if debug:
-                procLogFP.write('{}\n'.format(ex1))
-                procLogFP.flush()
-        finally:
-
-            if exception and not fullFailure:
-
-                if retriesRemaining > 0:
-                    time.sleep(retryDelay)
-                    print('Retrying')
-                    retriesRemaining = retriesRemaining - 1
-                else:
-                    print('Failure')
-                    currentRunNum = runcount
-                    raise Exception('Ran out of retries')
-            elif fullFailure:
-                currentRunNum = runcount
-                raise Exception('Closed')
-
-    if debug:
-        procLogFP.flush()
-        procLogFP.close()
+    apps.RunApplication(Iperf3App())
 

@@ -23,73 +23,51 @@ def PrepCall(url:str, duration:float, iperfRunTimes:int, learnerIpAddress:str, l
     return commands
 
 
-def __cleannup():
+class SeleniumFirefox(apps.App):
 
-    procNames = ['firefox', 'geckodriver']
+    def __cleannup(self):
 
-    for killName in procNames:
-        for proc in psutil.process_iter():
-            # check whether the process name matches
-            if killName in proc.name():
-                proc.kill()
+        procNames = ['firefox', 'geckodriver']
+
+        for killName in procNames:
+            for proc in psutil.process_iter():
+                # check whether the process name matches
+                if killName in proc.name():
+                    proc.kill()
 
 
-def __run(args:dict) -> dict:
+    def Run(self, args:dict) -> dict:
 
-    fireFoxOptions = webdriver.FirefoxOptions()
-    profile = webdriver.FirefoxProfile()
+        fireFoxOptions = webdriver.FirefoxOptions()
+        profile = webdriver.FirefoxProfile()
 
-    profile.set_preference("dom.disable_beforeunload", True)
+        profile.set_preference("dom.disable_beforeunload", True)
 
-    fireFoxOptions.headless = True
+        fireFoxOptions.headless = True
 
-    browser = webdriver.Firefox(options=fireFoxOptions, firefox_profile=profile)
+        browser = webdriver.Firefox(options=fireFoxOptions, firefox_profile=profile)
 
-    start = time.time()
-    browser.get(args['~url'])
-    end = time.time()
+        start = time.time()
+        browser.get(args['~url'])
+        end = time.time()
 
-    time.sleep(args['~duration'])
+        time.sleep(args['~duration'])
 
-    browser.quit()
-    browser.close()
+        browser.quit()
+        browser.close()
 
-    __cleannup()
+        self.__cleannup()
 
-    # Parse the output
-    result = {}
+        # Parse the output
+        result = {}
 
-    result['pageLoadTime'] = end-start
+        result['pageLoadTime'] = end-start
 
-    return result
+        return result
 
 
 if __name__ == '__main__':
 
-    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
-
-    # run n times, allows the controller to "explore" the environment
-    currentRunNum = 0
-    while(currentRunNum < runcount):
-
-        exception = False
-
-        try:
-
-            result = __run(currentArgs)
-
-            if endpoint is not None:
-                response = apps.SendToLearner(result, endpoint)
-
-                currentArgs = apps.UpdateArgs(currentArgs, response)
-
-            currentRunNum += 1
-        except KeyboardInterrupt as inter:
-            __cleannup()
-            raise inter
-        except subprocess.CalledProcessError as ex:
-            __cleannup()
-        except Exception as ex1:
-            __cleannup()
+    apps.RunApplication(SeleniumFirefox())
 
 

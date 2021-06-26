@@ -41,44 +41,34 @@ def PrepCall(webContentDir:str, serverRate:float=1000, runTimes:int=1000, learne
     return commands
 
 
-def __run(args:dict) -> dict:
+class HTTPServerApache(apps.App):
 
-    # Since Apache runs in the background "always" we will have the "run operation" be changing the contents in the server dir
 
-    # Move contents from webContent Dir into the apache content dir
+    def __run(self, args:dict) -> dict:
 
-    try:
-        pass
-        #shutil.rmtree( args['~serverDir'])
-        #print('Application : Apache Web dir {} erased'.format(args['~serverDir']))
-        #shutil.copytree(args['~webContentDir'], args['~serverDir'])
-        #print('Application : Apache Web dir {} copied to {}'.format(args['~webContentDir'], args['~serverDir']))
-    except Exception as ex:
-        print('Application : Apache HTTP Server: Problem copying Dirs {}'.format(ex))
+        # Since Apache runs in the background "always" we will have the "run operation" be changing the contents in the server dir
 
-    time.sleep(float(args['~serverRate']))
+        # Move contents from webContent Dir into the apache content dir
 
-    output = dict()
+        try:
+            pass
+            #shutil.rmtree( args['~serverDir'])
+            #print('Application : Apache Web dir {} erased'.format(args['~serverDir']))
+            #shutil.copytree(args['~webContentDir'], args['~serverDir'])
+            #print('Application : Apache Web dir {} copied to {}'.format(args['~webContentDir'], args['~serverDir']))
+        except Exception as ex:
+            print('Application : Apache HTTP Server: Problem copying Dirs {}'.format(ex))
 
-    # Add the action args
-    output.update(args)
+        time.sleep(float(args['~serverRate']))
 
-    return output
+        output = dict()
+
+        # Add the action args
+        output.update(args)
+
+        return output
 
 
 if __name__ == '__main__':
 
-    argDict, currentArgs, endpoint, runcount = apps.ParseDefaultArgs()
-
-    # run n times, allows the controller to "explore" the environment
-    currentRunNum = 0
-    while (currentRunNum < runcount):
-
-        result = __run(currentArgs)
-
-        if endpoint is not None:
-            response = apps.SendToLearner(result, endpoint, verbose=True)
-
-            currentArgs = apps.UpdateArgs(currentArgs, response)
-
-        currentRunNum += 1
+    apps.RunApplication(HTTPServerApache())
