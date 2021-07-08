@@ -14,8 +14,8 @@ TARGETVALUEFIELDNAME = 'rttAvg'
 Verbose = False
 
 # Read in data
-TrnFile = '../exps/experiment_01_ping_example/tmp/Traces/11-11-2020-11-55-43-trn-1-session-log.csv'
-TstFile = '../exps/experiment_01_ping_example/tmp/Traces/11-11-2020-12-01-11-trn-2-session-log.csv'
+TrnFile = '../exps/0X_ping_example/tmp/Traces/11-11-2020-11-55-43-trn-1-session-log.csv'
+TstFile = '../exps/0X_ping_example/tmp/Traces/11-11-2020-12-01-11-trn-2-session-log.csv'
 
 TrnDF = pd.read_csv(TrnFile)
 TstDF = pd.read_csv(TstFile)

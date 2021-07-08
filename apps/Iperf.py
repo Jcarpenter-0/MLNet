@@ -16,30 +16,6 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def PrepIperfCall(targetIPaddress:str, agentIPAddress:str=None, agentPort:int=None, probingApproach:int=0, parallelTCPConnections:int=None, runDuration:int=None, congestionControl:str=None, iperfRunTimes:int=10000, iperfPort:int=None) -> list:
-
-    iperfCommands = ['-c', targetIPaddress]
-
-    if iperfPort is not None:
-        iperfCommands.append('-p')
-        iperfCommands.append(iperfPort)
-
-    if parallelTCPConnections is not None:
-        iperfCommands.append('-P')
-        iperfCommands.append(parallelTCPConnections)
-
-    if runDuration is not None:
-        iperfCommands.append('-t')
-        iperfCommands.append(runDuration)
-
-    if congestionControl is not None:
-        iperfCommands.append('-Z')
-        iperfCommands.append(congestionControl)
-
-    commands = apps.PrepWrapperCall('{}apps/Iperf.py'.format(DirOffset), iperfCommands, iperfRunTimes, agentIPAddress, agentPort, probeApproach=probingApproach)
-    return commands
-
-
 def getCC() -> str:
 
     ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
@@ -100,6 +76,24 @@ class IperfApp(apps.App):
         dataDict['bits_per_second'] = float(output[8])
 
         return dataDict
+
+    def TranslateActions(self, args:dict) -> dict:
+
+        translatedActions = dict()
+
+        if '-parallel-tcp' in args.keys():
+            translatedActions['-P'] = args['-parallel-tcp']
+
+        if '-tcp-congestion-control' in args.keys():
+            translatedActions['-Z'] = args['-tcp-congestion-control']
+
+        if '-target-request-port' in args.keys():
+            translatedActions['-p'] = args['-target-request-port']
+
+        if '-run-duration-seconds' in args.keys():
+            translatedActions['-t'] = args['-run-duration-seconds']
+
+        return translatedActions
 
     def Run(self, runArgs:dict) -> (dict, list):
 

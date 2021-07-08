@@ -4,6 +4,7 @@ import networks
 import subprocess
 import time
 import os
+import netifaces
 import shutil
 
 # https://www.saltycrane.com/blog/2009/10/how-capture-stdout-in-real-time-python/

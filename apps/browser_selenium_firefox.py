@@ -16,10 +16,16 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium import webdriver
 
 
-def PrepCall(url:str, duration:float, iperfRunTimes:int, learnerIpAddress:str, learnerPort:int) -> list:
+def PrepCall(targetServerAddress:str, targetServerPort:int,
+                           agentServerAddress:str=None, agentServerPort:int=None,
+                           probingApproach:int=None, probingInterface:str=None, runDuration:int=None,
+                           protocol:str=None, parallelTCPConnections:int=None, logFilePath:str=None) -> list:
 
-    commands = apps.PrepWrapperCall('{}apps/browser_selenium_firefox.py'.format(DirOffset), ['~url', url, '~duration', '{}'.format(duration)], iperfRunTimes,
-                                    'http://{}:{}'.format(learnerIpAddress, learnerPort))
+    commands = apps.PrepGeneralWrapperCall('apps/browser_selenium_firefox/browser_selenium_firefox.py',
+                                           targetServerAddress, targetServerPort, agentServerAddress, agentServerPort,
+                                           probingApproach, probingInterface, runDuration, protocol, parallelTCPConnections,
+                                           logFilePath)
+
     return commands
 
 
@@ -35,7 +41,6 @@ class SeleniumFirefox(apps.App):
                 if killName in proc.name():
                     proc.kill()
 
-
     def Run(self, args:dict) -> dict:
 
         fireFoxOptions = webdriver.FirefoxOptions()
@@ -48,10 +53,10 @@ class SeleniumFirefox(apps.App):
         browser = webdriver.Firefox(options=fireFoxOptions, firefox_profile=profile)
 
         start = time.time()
-        browser.get(args['~url'])
+        browser.get('{}:{}{}'.format(args['-target-server-address'], args['-target--server-request-port'], args['-target-server-path']))
         end = time.time()
 
-        time.sleep(args['~duration'])
+        time.sleep(args['-run-duration-seconds'])
 
         browser.quit()
         browser.close()

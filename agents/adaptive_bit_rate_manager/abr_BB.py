@@ -4,8 +4,8 @@ sys.path.insert(0, os.getcwd())
 sys.path.insert(0, '../../')
 
 import numpy as np
-import learners
-import learners.learnerServer
+import agents
+import agents.agentServer
 
 
 # Some constants from Park and Pensieve's reward functions
@@ -13,7 +13,7 @@ M_IN_K = 1000.0
 VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
 
 
-class BufferBasedDecisionLogic(learners.MLModule):
+class BufferBasedDecisionLogic(agents.LogicModule):
 
     def __init__(self):
         """Implementing the Buffer Based (BB) Adaptive Bit Rate Algorithm: Described and partially copied from: Neural Adaptive Video Streaming with Pensieve"""
@@ -21,7 +21,7 @@ class BufferBasedDecisionLogic(learners.MLModule):
         self.Resevoir = 5
         super().__init__()
 
-    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.DomainModule):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info):
         """Quoting from Pensieve paper: uses a reservoir of 5 seconds and a cushion of 10 seconds,
          i.e., it selects bitrates with the goal of keeping the buffer occupancy above 5 seconds, and automatically
          chooses the highest available bitrate if the buffer occupancy exceeds 15 seconds."""
@@ -42,9 +42,9 @@ class BufferBasedDecisionLogic(learners.MLModule):
         return int(selectedBitRateIndex)
 
 
-class ABRControllerExperimentModule(learners.DomainModule):
+class ABRControllerExperimentModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath, traceFilePostFix=''):
+    def __init__(self, loggingDirPath):
 
         # Hold the history of some inputs
         self.history = dict()
@@ -52,9 +52,24 @@ class ABRControllerExperimentModule(learners.DomainModule):
         # Default initial bitrate index
         self.history['last_bit_rate'] = 0
 
-        super().__init__(loggingDirPath
-                         , traceFilePostFix=traceFilePostFix
-                         , actions={'bitRate':[0,1,2,3,4,5]})
+        super().__init__(loggingDirPath, actionFields={'bitRate':[0,1,2,3,4,5]})
+
+    def DefineObservation(self, rawObservation:dict) -> list:
+        desiredFields = ['lastquality'
+            ,'buffer'
+            ,'bandwidthEst'
+            ,'RebufferTime'
+            ,'lastChunkFinishTime'
+            ,'lastChunkStartTime'
+            ,'lastChunkSize']
+
+        observation = []
+
+        for value in desiredFields:
+            observation.append(rawObservation[value])
+
+        return observation
+
 
     def DefineReward(self, observation, rawObservation):
         """Reward function as outlined by Park and Pensieve: --linear reward-- """
@@ -80,12 +95,12 @@ class ABRControllerExperimentModule(learners.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, filePostFix, miscArgs = learners.learnerServer.ParseDefaultServerArgs()
+    port, address, mode, learnerDir, loggingPath, miscArgs = agents.agentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(learnerDir + 'BB-abr/', traceFilePostFix=filePostFix)
+    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath)
 
     # Declare a server
-    server = learners.learnerServer.MLServer(domainDF, BufferBasedDecisionLogic(), (address, port))
+    server = agents.agentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), (address, port))
 
     server.Run()

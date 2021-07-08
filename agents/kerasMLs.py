@@ -1,4 +1,4 @@
-import learners
+import agents
 
 import os
 import numpy as np
@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
-class kerasActorCritic(learners.MLModule):
+class kerasActorCritic(agents.LogicModule):
 
     def __init__(self
                  , learnerDir
@@ -39,7 +39,7 @@ class kerasActorCritic(learners.MLModule):
 
         if os.path.exists(self.ModelPath):
             self.model = keras.models.load_model(self.ModelPath)
-            print('Loading existing model')
+            print('Agent: Loading existing model')
         else:
 
             self.inputs = layers.Input(shape=(self.num_inputs,))
@@ -58,18 +58,14 @@ class kerasActorCritic(learners.MLModule):
         self.running_reward = 0
         self.episode_count = 0
 
-    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.DomainModule):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info):
 
         episode_reward = 0
-
-        print('Obv {} Rew {}'.format(observation, reward))
 
         with tf.GradientTape() as tape:
             # normalize the values
 
-            stateRaw = list(observation.values())
-
-            state = tf.convert_to_tensor(stateRaw)
+            state = tf.convert_to_tensor(observation)
             state = tf.expand_dims(state, 0)
 
             state = preprocessing.normalize(X=state, norm='l2', axis=1)
@@ -178,10 +174,10 @@ class kerasActorCritic(learners.MLModule):
 
                 self.model.save(self.ModelPath)
 
-        return actionSpace[action]
+        return action
 
 
-class kerasDDPG(learners.MLModule):
+class kerasDDPG(agents.LogicModule):
 
     def __init__(self
                  , learnerDir
@@ -288,8 +284,7 @@ class kerasDDPG(learners.MLModule):
         self.prev_state = None
         self.episodic_reward = 0
 
-    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info,
-                domainDefinition: learners.DomainModule):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info):
 
         if self.prev_state is None:
             self.prev_state = observation
@@ -322,7 +317,7 @@ class kerasDDPG(learners.MLModule):
 
         self.model.save(self.ModelPath)
 
-        return actionSpace[action]
+        return action
 
 
 class OUActionNoise:
@@ -443,7 +438,7 @@ def update_target(target_weights, weights, tau):
         a.assign(b * tau + a * (1 - tau))
 
 
-class kerasDeepQLearning(learners.MLModule):
+class kerasDeepQLearning(agents.LogicModule):
 
     def __init__(self
                  , learnerDir
@@ -539,7 +534,7 @@ class kerasDeepQLearning(learners.MLModule):
         self.lastState = None
         self.lastAction = 0
 
-    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info, domainDefinition:learners.DomainModule):
+    def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info):
 
         if self.lastState is None:
             self.lastState = observation
@@ -618,4 +613,4 @@ class kerasDeepQLearning(learners.MLModule):
         self.lastAction = action
         self.lastState = observation
 
-        return actionSpace[action]
+        return action

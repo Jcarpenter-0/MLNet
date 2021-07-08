@@ -5,9 +5,9 @@ sys.path.insert(0, '../../')
 
 import math
 import numpy as np
-import learners
-import learners.learnerServer
-import learners.kerasMLs
+import agents
+import agents.agentServer
+import agents.kerasMLs
 
 
 # Some constants from Park and Pensieve's reward functions
@@ -15,9 +15,9 @@ M_IN_K = 1000.0
 VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
 
 
-class ABRControllerExperimentModule(learners.DomainModule):
+class ABRControllerExperimentModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath, traceFilePostFix=''):
+    def __init__(self, loggingDirPath):
 
         # Hold the history of some inputs
         self.history = dict()
@@ -26,17 +26,24 @@ class ABRControllerExperimentModule(learners.DomainModule):
         self.history['last_bit_rate'] = 0
 
         super().__init__(loggingDirPath
-                         , traceFilePostFix=traceFilePostFix
-                         , observationFields=['lastquality',
-                                              'buffer',
-                                              'bandwidthEst',
-                                              'RebufferTime',
-                                              'lastChunkFinishTime',
-                                              'lastChunkStartTime',
-                                              'lastChunkSize'
-                                              ]
-                         , actions={'bitRate':[0,1,2,3,4,5]}
-                         , actionSpace=[0,1,2,3,4,5])
+                         , actionFields={'bitRate':[0,1,2,3,4,5]})
+
+    def DefineObservation(self, rawObservation:dict) -> list:
+
+        desiredFields = ['lastquality'
+            ,'buffer'
+            ,'bandwidthEst'
+            ,'RebufferTime'
+            ,'lastChunkFinishTime'
+            ,'lastChunkStartTime'
+            ,'lastChunkSize']
+
+        observation = []
+
+        for value in desiredFields:
+            observation.append(rawObservation[value])
+
+        return observation
 
     def DefineReward(self, observation, rawObservation):
         """Reward function as outlined by Park and Pensieve: --linear reward-- """
@@ -56,22 +63,20 @@ class ABRControllerExperimentModule(learners.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, filePostFix, miscArgs = learners.learnerServer.ParseDefaultServerArgs()
+    port, address, mode, learnerDir, loggingPath, miscArgs = agents.agentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(learnerDir + 'learner/', traceFilePostFix=filePostFix)
+    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath)
 
     # Depending on mode
     if mode == 1 or mode == 0:
         # training/testing
-        mlModule = learners.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.ObservationFields), len(domainDF.ActionSpace))
+        mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 7, len(domainDF.ActionSpace))
     else:
-        # pattern mode, for verification
-        pattern = learners.learnerServer.loadPatternFile(miscArgs[0])
 
-        mlModule = learners.PatternModule(pattern)
+        mlModule = agents.RepeatModule()
 
     # Declare a server
-    server = learners.learnerServer.MLServer(domainDF, mlModule, (address, port))
+    server = agents.agentServer.AgentServer(domainDF, mlModule, (address, port))
 
     server.Run()

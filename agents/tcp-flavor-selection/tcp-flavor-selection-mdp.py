@@ -5,21 +5,21 @@ sys.path.insert(0, '../../')
 
 import math
 
-import learners
-import learners.learnerServer
-import learners.kerasMLs
+import agents
+import agents.agentServer
+import agents.kerasMLs
 import mdp as mdplib
 
 
-class CongestionControlExperimentProblemModule(learners.MDPModule):
+class CongestionControlExperimentProblemModulePartial(agents.PartialMDPModule):
 
-    def __init__(self, loggingDirPath, traceFilePostFix):
+    def __init__(self, loggingDirPath):
 
         actionSpace = []
 
+        actionSpace.append({'-C': 'vegas'})
         actionSpace.append({'-C': 'cubic'})
         actionSpace.append({'-C': 'bbr'})
-        actionSpace.append({'-C': 'vegas'})
         actionSpace.append({'-C': 'reno'})
         actionSpace.append({'-C': 'bic'})
         actionSpace.append({'-C': 'htcp'})
@@ -40,36 +40,17 @@ class CongestionControlExperimentProblemModule(learners.MDPModule):
         # "high end" performance state 2
         mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 19], [2]))
 
-        super().__init__(loggingDirPath, mdp, traceFilePostFix, observationFields=['sender-bps',
-                                'num_streams',
-                                'blksize',
-                                'duration',
-                                'bytes',
-                                'reverse',
-                                'tcp_mss_default',
-                                'meanRTT',
-                                'minRTT',
-                                'sender-retransmits'], actions={
-                                'cubic': [0,1],
-                                'bbr': [0,1],
-                                'vegas': [0,1],
-                                'bic': [0, 1],
-                                'htcp': [0, 1],
-                                'illinois': [0, 1],
-                                'lp': [0, 1],
-                                'veno': [0, 1],
-                                'westwood': [0, 1],
-                                'reno': [0,1]}, actionSpace=actionSpace)
+        super().__init__(mdp, loggingDirPath, actionSpace=actionSpace)
 
     def DefineReward(self, observation, rawObservation):
 
         # Copa style reward = log(throughput) - log(delay)/2 - log(lost packets)
 
         # goodput (stated in copa paper, backed by ccp code, backed by park code)
-        throughput = float(observation['sender-bps'])
+        throughput = float(rawObservation['sender-bps'])
 
         # delay in ms (iperf gives it in usecs, backed in park, and backed in ccp codes)
-        delay = ((float(observation['meanRTT']) - float(observation['minRTT']))/1000)
+        delay = ((float(rawObservation['meanRTT']) - float(rawObservation['minRTT']))/1000)
 
         # TCP retransmits seem too low for it to make sense
         lostPackets = int(rawObservation['sender-retransmits'])
@@ -92,24 +73,21 @@ class CongestionControlExperimentProblemModule(learners.MDPModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, filePostFix, miscArgs = learners.learnerServer.ParseDefaultServerArgs()
+    port, address, mode, learnerDir, loggingPath, miscArgs = agents.agentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = CongestionControlExperimentProblemModule(learnerDir + 'learner/', traceFilePostFix=filePostFix)
+    domainDF = CongestionControlExperimentProblemModulePartial(learnerDir + loggingPath)
 
     # Depending on mode
     if mode == 1 or mode == 0:
         # training/testing
 
         # +1 input field, to count the state ID
-        mlModule = learners.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.ObservationFields) + 1, len(domainDF.ActionSpace))
+        mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 11, len(domainDF.ActionSpace))
     else:
-        # pattern mode, for verification
-        pattern = learners.learnerServer.loadPatternFile(miscArgs[0])
-
-        mlModule = learners.PatternModule(pattern)
+        mlModule = agents.RepeatModule()
 
     # Declare a server
-    server = learners.learnerServer.MLServer(domainDF, mlModule, (address, port))
+    server = agents.agentServer.AgentServer(domainDF, mlModule, (address, port))
 
     server.Run()

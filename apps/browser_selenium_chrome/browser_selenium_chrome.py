@@ -15,15 +15,15 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium import webdriver
 
 
-def PrepCall(url:str, duration:float, runTimes:int, learnerIpAddress:str, learnerPort:int) -> list:
+def PrepCall(targetServerAddress:str, targetServerPort:int,
+                           agentServerAddress:str=None, agentServerPort:int=None,
+                           probingApproach:int=None, probingInterface:str=None, runDuration:int=None,
+                           protocol:str=None, parallelTCPConnections:int=None, logFilePath:str=None) -> list:
 
-    if learnerIpAddress is not None and learnerPort is not None:
-
-        commands = apps.PrepWrapperCall('{}apps/browser_selenium_chrome/browser_selenium_chrome.py'.format(DirOffset), ['~url', url, '~duration', '{}'.format(duration)], runTimes,
-                                        'http://{}:{}'.format(learnerIpAddress, learnerPort))
-    else:
-        commands = apps.PrepWrapperCall('{}apps/browser_selenium_chrome/browser_selenium_chrome.py'.format(DirOffset),
-                                        ['~url', url, '~duration', '{}'.format(duration)], runTimes, "")
+    commands = apps.PrepGeneralWrapperCall('apps/browser_selenium_chrome/browser_selenium_chrome.py',
+                                           targetServerAddress, targetServerPort, agentServerAddress, agentServerPort,
+                                           probingApproach, probingInterface, runDuration, protocol, parallelTCPConnections,
+                                           logFilePath)
 
     return commands
 
@@ -41,10 +41,12 @@ class SeleniumChrome(apps.App):
         browser = webdriver.Chrome(executable_path='{}apps/browser_selenium_chrome/chromedriver_linux64/chromedriver'.format(DirOffset), options=chromeOptions)
 
         start = time.time()
-        browser.get(args['~url'])
+        browser.get('{}:{}{}'.format(args['-target-server-address'], args['-target--server-request-port'],
+                                     args['-target-server-path']))
+
         end = time.time()
 
-        time.sleep(args['~duration'])
+        time.sleep(args['-run-duration-seconds'])
 
         browser.quit()
 

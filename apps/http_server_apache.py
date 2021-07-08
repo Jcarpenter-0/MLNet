@@ -19,7 +19,7 @@ import apps
 # refresh rate (when to "review" contents of the server), collect server data, and then do the learner exchange
 
 
-def PrepCall(webContentDir:str, serverRate:float=1000, runTimes:int=1000, learnerIpAddress:str=None, learnerPort:int=None, apacheDir:str='/var/www/html/') -> list:
+def PrepCall(webContentDir:str, serverRate:float=1000, learnerIpAddress:str=None, learnerPort:int=None, apacheDir:str='/var/www/html/') -> list:
 
     learnerTarget = ''
 
@@ -37,14 +37,13 @@ def PrepCall(webContentDir:str, serverRate:float=1000, runTimes:int=1000, learne
     if learnerIpAddress is not None and learnerPort is not None:
         learnerTarget = 'http://{}:{}'.format(learnerIpAddress, learnerPort)
 
-    commands = apps.PrepWrapperCall('{}apps/http_server_apache.py'.format(DirOffset), args, runTimes, learnerTarget)
+    commands = apps.PrepWrapperCall('{}apps/http_server_apache.py'.format(DirOffset), args, learnerTarget)
     return commands
 
 
 class HTTPServerApache(apps.App):
 
-
-    def __run(self, args:dict) -> dict:
+    def Run(self, args:dict) -> dict:
 
         # Since Apache runs in the background "always" we will have the "run operation" be changing the contents in the server dir
 

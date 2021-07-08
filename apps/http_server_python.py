@@ -32,31 +32,16 @@ class HTTPServerPython(apps.App):
 
         return {}
 
-    def __run(self, args:dict) -> dict:
+    def Run(self, args:dict) -> dict:
 
         cmdArgs = apps.ToPopenArgs(args)
 
         command = ['python3']
         command.extend(cmdArgs)
 
-        outputRaw = bytes()
+        outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
 
-        try:
-            outputRaw = subprocess.check_output(command, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as ex:
-            if debug:
-                procLogFP.write('{} - {} - {}\n'.format(ex.returncode, ex.stdout, ex.stderr))
-                procLogFP.flush()
-        except Exception as ex:
-            if debug:
-                procLogFP.write('Check Error: {}\n'.format(ex))
-                procLogFP.flush()
-
-        if debug:
-            procLogFP.write('OutputRaw: {}\n'.format(outputRaw.decode()))
-            procLogFP.flush()
-
-        output = self.ParseOutput(outputRaw, currentArgs)
+        output = self.ParseOutput(outputRaw, args)
 
         # Add the action args
         output.update(args)

@@ -1,3 +1,5 @@
+import netifaces
+
 import apps.daemon_process
 import apps.daemon_server
 import subprocess
@@ -26,7 +28,7 @@ class NetworkModule(object):
             node.StartApplications(interApplicationDelay)
             time.sleep(interNodeDelay)
 
-    def StopNodes(self, interNodeDelay=0, interApplicationDelay=0):
+    def StopNodes(self, interNodeDelay=0):
         """Only stop the applications running on the nodes"""
         for node in self.Nodes:
             node.StopApplications()
@@ -202,7 +204,7 @@ class Node(object):
             print('Framework: Node {} input tree removed'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/') -> Node:
+def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/') -> (Node, str, str):
 
     # run daemon server
     if daemonServerPort is not None:
@@ -227,4 +229,4 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=No
 
     print('Framework: Localhost Node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
 
-    return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc)
+    return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc), '127.0.0.1', netifaces.interfaces()[0]

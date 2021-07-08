@@ -2,6 +2,7 @@ import numpy as np
 import subprocess
 import os
 import shutil
+import netifaces
 
 from typing import Tuple
 
@@ -133,11 +134,11 @@ class MahiMahiLinkShell(MahiMahiShell):
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str]:
+def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
-    :return:
+    :return generated Node, baseIPaddress, interface for node:
     """
 
     mmCommands = []
@@ -191,7 +192,7 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirO
 
     node = networks.Node(ipAddress=ipAddress, nodeProc=finalmmProc, daemonPort=daemonPort, inputDir=inputDir)
 
-    return node, '100.64.0.1'
+    return node, '100.64.0.1', netifaces.interfaces()[-1]
 
 
 def ParseMMLogFile(logFilePath:str, timeGrouping:int=0) -> list:
