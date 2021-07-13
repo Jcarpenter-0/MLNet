@@ -30,7 +30,7 @@ def PrepGeneralWrapperCall(commandFilePath:str,
                            targetServerAddress:str=None, targetServerPort:int=None, targetServerPath:str=None,
                            agentServerAddress:str=None, agentServerPort:int=None,
                            probingApproach:int=None, probingInterface:str=None, runDuration:int=None,
-                           protocol:str=None, parallelTCPConnections:int=None, logFilePath:str=None,
+                           protocol:str=None, parallelTCPConnections:int=None, logFilePath:str=None, pollRate:float=None,
                            additionalArgs:dict=None, dirOffset:str='./../../', removeNones:bool=True) -> list:
     """Using the "general" language of parameters create a process call friendly command.
     Any "parameter" that overlaps with two or more applications idealily should bere."""
@@ -173,7 +173,8 @@ def ParseTCPDump(filePath:str) -> dict:
     lastTimeSeconds = lastTSSeconds + (60 * lastTSMinutes) + (60 * 60 * lastTSHours)
 
     # Last - First Timestamps
-    dataDict['collection-duration-seconds'] = abs(lastTimeSeconds - firstTimeSeconds)
+    duration = abs(lastTimeSeconds - firstTimeSeconds)
+    dataDict.update(DurationDMF(value=duration, unit='second', traits=['network-level', 'link-sum']).ToDict())
 
     latencies = []
 
@@ -187,14 +188,12 @@ def ParseTCPDump(filePath:str) -> dict:
                 # Match found, put timebetween into list
                 latencies.append(abs(float(ack['timestamp-seconds'] - seq['timestamp-seconds'])))
 
-    dataDict['latency|packet-analyzer|link|per-packet|average'] = np.mean(latencies)
+    dataDict.update(RoundTripTimeDMF(value=np.mean(latencies), unit='second', traits=['network-level', 'link-sum', 'average']).ToDict())
 
     # Count duplicate sequence numbers (unique - all)
-    dataDict['loss|packet-analyzer|link|per-packet-pair|difference-of-unique-sequence-numbers'] = len(sequenceNumbers) - len(np.unique(sequenceNumbers))
-
-    dataDict['transfered-bytes|packet-analyzer|link|per-packet|sum'] = np.sum(packetSizes)
-
-    dataDict['throughput|packet-analyzer|link|per-second|sum|divided-over-duration'] = np.sum(packetSizes)/dataDict['collection-duration-seconds']
+    dataDict.update(LossDMF(value=len(sequenceNumbers) - len(np.unique(sequenceNumbers)), unit='packet', traits=['network-level', 'link-sum', 'difference-of-unique-sequence-numbers']).ToDict())
+    dataDict.update(DataSentDMF(value=np.sum(packetSizes), unit='packet', traits=['network-level', 'link-sum']).ToDict())
+    dataDict.update(ThroughputDMF(value=np.sum(packetSizes)/duration, unit='byte-per-second', traits=['network-level', 'link-sum']).ToDict())
 
     return dataDict
 
@@ -215,36 +214,39 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
 
     startSection = output['start']
 
-    dataDict['target-address'] = startSection['connecting_to']['host']
-    dataDict['target-port'] = startSection['connecting_to']['port']
-    dataDict['version'] = startSection['version']
-    dataDict['time'] = "{}".format(startSection['timestamp']['time'])
-    dataDict['timesecs'] = startSection['timestamp']['timesecs']
-    dataDict['tcp_mss_default'] = startSection['tcp_mss_default']
+    dataDict.update(TargetAddressDMF(value=startSection['connecting_to']['host'], unit='IP', traits=['application-level']).ToDict())
+    dataDict.update(TargetPortDMF(value=startSection['connecting_to']['port'], unit='Port', traits=['application-level']).ToDict())
 
-    dataDict['protocol'] = startSection['test_start']['protocol']
-    dataDict['parallel-tcp-connections'] = startSection['test_start']['num_streams']
+    dataDict['version'] = startSection['version']
+
+    dataDict.update(TimeStampDMF(value=startSection['timestamp']['time'], unit='date-time', traits=['application-level','day-of-week, day month-abbreviated year, hour:minute:second GMT']).ToDict())
+    dataDict.update(TimeStampDMF(value=startSection['timestamp']['timesecs'], unit='second', traits=['application-level','epoch-seconds']).ToDict())
+    dataDict.update(TCPMinimumSendSizeDMF(value=startSection['tcp_mss_default'], unit='byte', traits=['application-level', 'default']).ToDict())
+    dataDict.update(ProtocolDMF(value=startSection['test_start']['protocol'], unit='transport-layer', traits=['application-level', 'transport-layer']).ToDict())
+    dataDict.update(ParallelStreams(value=startSection['test_start']['num_streams'], unit='data-stream', traits=['application-level', 'transport-layer']).ToDict())
+
     dataDict['blksize'] = startSection['test_start']['blksize']
     dataDict['omit'] = startSection['test_start']['omit']
-    dataDict['duration|seconds'] = startSection['test_start']['duration']
     dataDict['bytes'] = startSection['test_start']['bytes']
     dataDict['blocks'] = startSection['test_start']['blocks']
     dataDict['reverse'] = startSection['test_start']['reverse']
+
+    dataDict.update(DurationDMF(value=float(startSection['test_start']['duration']), unit='second', traits=['application-level']).ToDict())
 
     endSection = output['end']
 
     sendSection = endSection['sum_sent']
 
-    dataDict['sender-duration|second'] = sendSection['seconds']
-    dataDict['sender-received-data|byte'] = sendSection['bytes']
-    dataDict['sender-throughput|bits-per-second'] = sendSection['bits_per_second']
-    dataDict['loss|sender-retransmits'] = sendSection['retransmits']
+    dataDict.update(DurationDMF(value=float(sendSection['seconds']), unit='second', traits=['application-level', 'sender']).ToDict())
+    dataDict.update(DataSentDMF(value=float(sendSection['bytes']), unit='byte', traits=['sender', 'application-level']).ToDict())
+    dataDict.update(ThroughputDMF(value=float(sendSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'sender']).ToDict())
+    dataDict.update(LossDMF(value=float(sendSection['retransmits']), unit='retransmits', traits=['application-level', 'sender']).ToDict())
 
     recSection = endSection['sum_received']
 
-    dataDict['receiver-duration|second'] = recSection['seconds']
-    dataDict['receiver-received-data|byte'] = recSection['bytes']
-    dataDict['receiver-throughput|bits-per-second'] = recSection['bits_per_second']
+    dataDict.update(DurationDMF(value=float(recSection['seconds']), unit='second', traits=['application-level', 'receiver']).ToDict())
+    dataDict.update(DataReceivedDMF(value=float(recSection['bytes']), unit='byte', traits=['receiver', 'application-level']).ToDict())
+    dataDict.update(ThroughputDMF(value=float(recSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'receiver']).ToDict())
 
     # Stream dissection
     streamSection = endSection['streams']
@@ -272,12 +274,13 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
         avgRTTs.append(meanRTT)
 
     # Calculate macros
-    dataDict['Round-trip-time|application-level|maximum'] = float(np.mean(maxRTTs))
-    dataDict['Round-trip-time|application-level|minimum'] = float(np.mean(minRTTs))
-    dataDict['Round-trip-time|application-level|mean'] = float(np.mean(avgRTTs))
-    dataDict['tcp-send-congestion-window|max'] = int(np.max(maxSendCWNDs))
-    dataDict['tcp-send-congestion-window|mean'] = float(np.mean(maxSendCWNDs))
-    dataDict['tcp-send-congestion-window|minimum'] = int(np.min(maxSendCWNDs))
+    dataDict.update(RoundTripTimeDMF(value=float(np.mean(maxRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'maximum']).ToDict())
+    dataDict.update(RoundTripTimeDMF(value=float(np.mean(minRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'minimum']).ToDict())
+    dataDict.update(RoundTripTimeDMF(value=float(np.mean(avgRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'average']).ToDict())
+
+    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.max(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'maximum']).ToDict())
+    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=float(np.mean(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'average']).ToDict())
+    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.min(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'minimum']).ToDict())
 
     dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
 
@@ -290,19 +293,19 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
 
 class DescriptiveMetricFormat(object):
 
-    def __init__(self, name:str, value=None, traits:list=[], units:list=[]):
+    def __init__(self, name:str, unit:str, value=None, traits:list=[]):
         """plain python object representation of the DMF"""
         self.Name:str = name
         # Traits: link-level, applicaton-level, user-generated
         self.Traits:list = traits
         # Units: bytes, bits, seconds, days, meters, farenhiet, packets, etc
-        self.Units:list = units
+        self.Unit:str = unit
         # Value
         self.Value = value
 
     def SerializeDMF(self, groupDeliminator:str=":") -> str:
         """Serialize into simple "bar" delimited format for description"""
-        return '{}{}{}{}{}'.format(self.Name, groupDeliminator, '|'.join(self.Traits), groupDeliminator, '|'.join(self.Units))
+        return '{}{}{}{}{}'.format(self.Name, groupDeliminator, '|'.join(self.Traits), groupDeliminator, '|'.join(self.Unit))
 
     def ToDict(self) -> dict:
         """Convert to Dict"""
@@ -319,15 +322,122 @@ def ParseDMF(dmfLabel:str, dmfValue, groupDeliminator:str=":", subDeliminator:st
     return DescriptiveMetricFormat(metricName, dmfValue, traits, units)
 
 
-class CoreDMFMetrics(object):
+#========================
+# Some core DMF Metrics
+# These help enforce the standard and provide quick definitions
+#========================
 
-    def __init__(self, latency:DescriptiveMetricFormat, loss:DescriptiveMetricFormat, throughput:DescriptiveMetricFormat, dataTransfered:DescriptiveMetricFormat, duration:DescriptiveMetricFormat):
-        """The core networking metrics"""
-        self.Latency:DescriptiveMetricFormat = latency
-        self.Loss:DescriptiveMetricFormat = loss
-        self.Throughput:DescriptiveMetricFormat = throughput
-        self.DataTransfered:DescriptiveMetricFormat = dataTransfered
-        self.Duration:DescriptiveMetricFormat = duration
+
+class LatencyDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for latency"""
+        super().__init__(name="latency", unit=unit, value=value, traits=traits)
+
+
+class RoundTripTimeDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for rtt"""
+        super().__init__(name="round-trip-time", unit=unit, value=value, traits=traits)
+
+
+class LossDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for loss"""
+        super().__init__(name="loss", unit=unit, value=value, traits=traits)
+
+
+class ThroughputDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for throughput"""
+        super().__init__(name="throughput", unit=unit, value=value, traits=traits)
+
+
+class DurationDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for duration"""
+        super().__init__(name="duration", unit=unit, value=value, traits=traits)
+
+
+class DataSentDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for data"""
+        super().__init__(name="data-sent", unit=unit, value=value, traits=traits)
+
+
+class DataReceivedDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for data"""
+        super().__init__(name="data-received", unit=unit, value=value, traits=traits)
+
+
+class TargetAddressDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for address"""
+        super().__init__(name="target-address", unit=unit, value=value, traits=traits)
+
+
+class TargetPortDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for port"""
+        super().__init__(name="target-port", unit=unit, value=value, traits=traits)
+
+
+class TCPMinimumSendSizeDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for mss"""
+        super().__init__(name="tcp-minimum-send-size", unit=unit, value=value, traits=traits)
+
+
+class TimeStampDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for timestamp"""
+        super().__init__(name="timestamp", unit=unit, value=value, traits=traits)
+
+
+class ProtocolDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for protocol"""
+        super().__init__(name="protocol", unit=unit, value=value, traits=traits)
+
+
+class ParallelStreams(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for parallel connections"""
+        super().__init__(name="parallel-connections", unit=unit, value=value, traits=traits)
+
+
+class PollRateDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for application/system's activity rate"""
+        super().__init__(name="poll-rate", unit=unit, value=value, traits=traits)
+
+
+class BufferSizeDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for buffer size"""
+        super().__init__(name="buffer-size", unit=unit, value=value, traits=traits)
+
+
+class BufferCapacityDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value, traits:list=[]):
+        """Prefab for buffer capacity, specifically whats in the buffer"""
+        super().__init__(name="buffer-capacity", unit=unit, value=value, traits=traits)
 
 
 # =============================
@@ -337,6 +447,7 @@ class CoreDMFMetrics(object):
 # PENDING
 
 # =============================
+
 
 class App(object):
 

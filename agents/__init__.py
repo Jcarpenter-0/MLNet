@@ -1,5 +1,8 @@
 import os
 import datetime
+
+from typing import List
+
 import mdp
 import apps
 
@@ -62,48 +65,8 @@ def CompareDMF(dmf1:apps.DescriptiveMetricFormat, dmf2:apps.DescriptiveMetricFor
 
 # Conversion Tree is a "thruple" (metric, operation, metric2) in a one-direction, reverse for metric2 to metric1
 
-
-conversionTree = {
-    "bit":{"byte":lambda *x : x[0]/8, "kilobit":lambda *x : x[0]/1000, "bits-per-second": lambda *x: x[0]/x[1]['duration|seconds']},
-    "kilobit":{"bit":lambda *x : x[0]*1000, "megabit":lambda *x : x[0]/1000},
-    "megabit": {"kilobit":lambda *x : x[0]*1000, "gigabit":lambda *x : x[0]/1000},
-    "gigabit":{"megabit":lambda *x : x[0]*1000},
-    "byte":{"bit":lambda *x : x[0]*8, "kilobyte":lambda *x : x[0]/1024, "ethernet-packet":lambda *x : x[0]/1500, "ip-packet":lambda *x : x[0]/65535},
-    "kilobyte":{"byte":lambda *x : x[0]*1024, "megabyte":lambda *x : x[0]/1024},
-    "megabyte":{"kilobyte":lambda *x : x[0]*1024, "gigabyte":lambda *x : x[0]/1024},
-    "gigabyte":{"megabyte":lambda *x : x[0]/1024},
-    "nanosecond": {"millisecond":lambda *x : x[0]/1000},
-    "millisecond":{"nanosecond":lambda *x : x[0]*1000, "second":lambda *x : x[0]/1000},
-    "second":{"millisecond":lambda *x : x[0]*1000, "minute":lambda *x : x[0]/60},
-    "minute":{"second":lambda *x : x[0]*60, "hour":lambda *x : x[0]/60},
-    "hour":{"minute":lambda *x : x[0]*60, "day":lambda *x : x[0]/24},
-    "day":{"hour":lambda *x : x[0]*24, "year":lambda *x : x[0]/365},
-    "year":{"day":lambda *x : x[0]*365, "decade":lambda *x : x[0]/10},
-    "decade":{"year":lambda *x : x[0]*24, "century":lambda *x : x[0]/10},
-    "century":{"decade":lambda *x : x[0]*10},
-    "ethernet-packet":{"byte":lambda *x : x[0]*1500},
-    "ip-packet":{"byte":lambda *x : x[0]*65535},
-    "bits-per-second":{"bit": lambda *x : x[0] * x[1]["duration|seconds"], "kilobits-per-second":lambda *x : x[0]/1000},
-    "kilobits-per-second": {"bits-per-second":lambda *x : x[0]*1000, "kilobits-per-second":lambda *x : x[0]/1000},
-    "megabits-per-second":{"kilobits-per-second":lambda *x : x[0]*1000, "gigabits-per-second":lambda *x : x[0]/1000},
-    "gigabits-per-second":{"megabits-per-second":lambda *x : x[0]*1000}
-}
-
-
-def __getMetric(desiredMetric:apps.DescriptiveMetricFormat, observation:dict, conversionTree:dict=conversionTree) -> apps.DescriptiveMetricFormat:
-    """Find a metric (or convert a metric) in an observation.
-    Will construct the connectives from the metric, then try to find the closest metric from the observation
-    """
-
-    # Convert observation to DMF list
-    dmfMetrics = []
-
-    for key in observation:
-        newDMF = apps.ParseDMF(key, observation[key])
-
-        dmfMetrics.append(newDMF)
-
-    return None
+# Fully initialized below methods
+conversionTree = {}
 
 
 def __createConversionBFSTree(rootMetric:str, conversionTree:dict=conversionTree) -> dict:
@@ -159,33 +122,139 @@ def __resolveMetricPath(startMetric:str, endMetric:str, conversionTree:dict=conv
     return path
 
 
-def AdjustMetric(startDMFValue:float, startDMF:str, endDMF:str, conversionTree:dict=conversionTree) -> (float, list):
-    """From a starting point to an ending point, do the operations in the conversion tree until end reached.
-    Return warnings and the adjusted value (up to the point it can't go without more adjustment)"""
+def __resolveDMFConversion(desiredMetric:apps.DescriptiveMetricFormat, observationDMFs: List[apps.DescriptiveMetricFormat], conversionTree:dict=conversionTree) -> apps.DescriptiveMetricFormat:
+    """"""
+    # check if any existing DMF's match the desired at the top level
+    matches = []
 
-    warnings = []
-    onGoingMetric = startDMFValue
+    for dmfMetric in observationDMFs:
+        if dmfMetric.Name == desiredMetric.Name:
+            matches.append(dmfMetric)
 
-    startMetricTags = set(startDMF.split('|'))
+    returnDMF = None
 
-    endMetricTags = set(endDMF.split('|'))
+    if len(matches) > 0:
+        # we have least 1
+        returnDMF = matches[0]
 
-    resolveTags = startMetricTags - endMetricTags
+        # ensure consistency of unit
+        path = __resolveMetricPath(returnDMF.Unit, desiredMetric.Unit, conversionTree)
 
-    if len(resolveTags) > 0:
-        warnings.append("There are {} tags to convert/adjust".format(len(resolveTags)))
+        # run ops along path
+        for stepNum in range(0,len(path)-1):
+            step = path[stepNum]
+            nextStep = path[stepNum + 1]
+            operation = conversionTree[step][nextStep]
 
-    for tag in resolveTags:
+            returnDMF.Value = operation(returnDMF.Value, observationDMFs)
+            returnDMF.Unit = nextStep
 
-        # "eliminate" the metrics that exist in start but not end
-        if tag in startMetricTags and tag not in endMetricTags:
-            onGoingMetric = conversionTree[0][tag]
+    else:
+        # have none, must then convert other metrics to this one
+        metricAlternatives = __createConversionBFSTree(desiredMetric.Unit, conversionTree)
 
-        # "add" the metrics that exist in end but not start
-        if tag not in startMetricTags and tag in endMetricTags:
-            onGoingMetric = conversionTree[0][tag]
+        # try to find the closest alternative
+        returnDMF = desiredMetric
 
-    return (onGoingMetric, warnings)
+
+        for key in metricAlternatives:
+
+            matchingUnits = []
+
+            # Find metrics that match the unit needed
+            for observationDMF in observationDMFs:
+
+                if observationDMF.Unit in key:
+                    matchingUnits.append(observationDMF)
+
+            nextStepLabel = None
+
+            for observationDMF in matchingUnits:
+                try:
+
+                    # Found a metric, now attempt to convert it into what we need
+                    path = __resolveMetricPath(observationDMF.Unit, desiredMetric.Unit, conversionTree)
+
+                    # run ops along path
+                    for stepNum in range(0, len(path) - 1):
+                        step = path[stepNum]
+                        nextStep = path[stepNum + 1]
+                        nextStepLabel = nextStep
+                        operation = conversionTree[step][nextStep]
+
+                        # How do we resolve the "duration" check?
+                        returnDMF.Value = operation(observationDMF.Value, observationDMFs, conversionTree)
+                        returnDMF.Unit = nextStep
+
+                    return returnDMF
+
+                except Exception as ex:
+                    print('Cannot use alternative {} to {}'.format(key, nextStepLabel))
+                    print(ex)
+
+    if returnDMF is not None and returnDMF.Value is None:
+        returnDMF = None
+
+    return returnDMF
+
+
+def _getMetrics(desiredMetricDMFs:list, observation:dict, conversionTree:dict=conversionTree) -> list:
+    """Find a metric (or convert a metric) in an observation.
+    Will construct the connectives from the metric, then try to find the closest metric from the observation
+    """
+
+    # Convert observation to DMF list, for matching metric name of desired
+    dmfMetrics = []
+
+    for key in observation:
+
+        try:
+            newDMF = apps.ParseDMF(key, observation[key])
+
+            dmfMetrics.append(newDMF)
+        except Exception as ex:
+            print('Error Parsing a metric {}'.format(key))
+
+    resolvedMetrics = []
+
+    for desiredMetric in desiredMetricDMFs:
+        __resolveDMFConversion(desiredMetric, dmfMetrics, conversionTree)
+
+    return resolvedMetrics
+
+
+
+fullConversions = {
+    "bit":{"byte":lambda *x : x[0]/8, "kilobit":lambda *x : x[0]/1000, "bits-per-second": lambda *x: x[0]/__resolveDMFConversion(apps.DescriptiveMetricFormat('duration', unit='second'), x[1], x[2]).Value},
+    "kilobit":{"bit":lambda *x : x[0]*1000, "megabit":lambda *x : x[0]/1000},
+    "megabit": {"kilobit":lambda *x : x[0]*1000, "gigabit":lambda *x : x[0]/1000},
+    "gigabit":{"megabit":lambda *x : x[0]*1000},
+    "byte":{"bit":lambda *x : x[0]*8, 'bytes-per-second':lambda *x: x[0]/__resolveDMFConversion(apps.DescriptiveMetricFormat('duration', unit='second'), x[1], x[2]).Value, "kilobyte":lambda *x : x[0]/1024, "ethernet-packet":lambda *x : x[0]/1500, "ip-packet":lambda *x : x[0]/65535},
+    "kilobyte":{"byte":lambda *x : x[0]*1024, "megabyte":lambda *x : x[0]/1024},
+    "megabyte":{"kilobyte":lambda *x : x[0]*1024, "gigabyte":lambda *x : x[0]/1024},
+    "gigabyte":{"megabyte":lambda *x : x[0]/1024},
+    "nanosecond": {"millisecond":lambda *x : x[0]/1000},
+    "millisecond":{"nanosecond":lambda *x : x[0]*1000, "second":lambda *x : x[0]/1000},
+    "second":{"millisecond":lambda *x : x[0]*1000, "minute":lambda *x : x[0]/60},
+    "minute":{"second":lambda *x : x[0]*60, "hour":lambda *x : x[0]/60},
+    "hour":{"minute":lambda *x : x[0]*60, "day":lambda *x : x[0]/24},
+    "day":{"hour":lambda *x : x[0]*24, "year":lambda *x : x[0]/365},
+    "year":{"day":lambda *x : x[0]*365, "decade":lambda *x : x[0]/10},
+    "decade":{"year":lambda *x : x[0]*24, "century":lambda *x : x[0]/10},
+    "century":{"decade":lambda *x : x[0]*10},
+    "ethernet-packet":{"byte":lambda *x : x[0]*1500},
+    "ip-packet":{"byte":lambda *x : x[0]*65535},
+    "bits-per-second":{"bit": lambda *x : x[0] * __resolveDMFConversion(apps.DescriptiveMetricFormat('duration', unit='second'), x[1], x[2]).Value, "kilobits-per-second":lambda *x : x[0]/1000},
+    "kilobits-per-second": {"bits-per-second":lambda *x : x[0]*1000, "kilobits-per-second":lambda *x : x[0]/1000},
+    "megabits-per-second":{"kilobits-per-second":lambda *x : x[0]*1000, "gigabits-per-second":lambda *x : x[0]/1000},
+    "gigabits-per-second":{"megabits-per-second":lambda *x : x[0]*1000},
+    "bytes-per-second": {"byte": lambda *x: x[0] * __resolveDMFConversion(apps.DescriptiveMetricFormat('duration', unit='second'), x[1], x[2]).Value,"kilobytes-per-second": lambda *x: x[0] / 1024},
+    "kilobytes-per-second": {"bytes-per-second": lambda *x: x[0] * 1024, "megabytes-per-second": lambda *x: x[0] / 1024},
+    "megabytes-per-second": {"kilobytes-per-second": lambda *x: x[0] * 1024,"gigabytes-per-second": lambda *x: x[0] / 1024},
+    "gigabytes-per-second": {"megabits-per-second": lambda *x: x[0] * 1024}
+}
+
+conversionTree = conversionTree.update(fullConversions)
 
 # ==========================
 
@@ -316,14 +385,16 @@ class PartialMDPModule(DomainModule):
 
 class AdaptationModule(DomainModule):
 
-    def __init__(self):
+    def __init__(self, desiredObservationMetrics:List[apps.DescriptiveMetricFormat], logPath:str=None, actionFields:dict=None, actionSpace:list=None):
         """Domain Module that will, given a desired set of observation metrics, attempt to ensure that any data coming in conforms that standard."""
-        super().__init__()
+        super().__init__(logPath, actionFields, actionSpace)
+
+        # the metrics you want, and the module will "enforce" as best as it is able
+        self.DesiredObservations = desiredObservationMetrics
 
     def DefineObservation(self, rawObservation:dict) -> list:
         """Use basic adaptation to ensure consistency of metrics"""
-
-        return super().DefineObservation(rawObservation)
+        return _getMetrics(self.DesiredObservations, rawObservation)
 
 # Basic Logic Modules
 

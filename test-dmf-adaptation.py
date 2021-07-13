@@ -4,10 +4,14 @@ import agents
 # Demonstrate the DMF functionality
 import apps
 
-desiredObservation = apps.DescriptiveMetricFormat("throughput", traits=['link-level'], units=['byte','second'])
+desiredObservation = apps.DescriptiveMetricFormat(name="throughput", traits=['link-level'], unit='bytes-per-second')
 
-tstSerial = desiredObservation.SerializeDMF()
+recievedObservation = [apps.DescriptiveMetricFormat(name="transferred data", value=955, traits=['application-level','per-transaction'], unit='byte'),
+                       apps.DescriptiveMetricFormat(name="duration", value=10,
+                                                    traits=['application-level', 'per-transaction'], unit='second')
 
-recievedObservation = apps.DescriptiveMetricFormat(name="throughput", value=955, traits=['application-level','per-transaction'], units=['kilobyte','minute']).ToDict()
+                       ]
 
-newMetric = agents.__getMetric(desiredObservation, recievedObservation)
+newMetric = agents.__resolveDMFConversion(desiredObservation, recievedObservation)
+
+print()
