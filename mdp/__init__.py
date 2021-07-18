@@ -60,15 +60,35 @@ def AnalyzeObservation(observation:dict, possibleStates:list):
             return state, idx
 
 
-if __name__ == '__main__':
+import apps.framework_DMF
 
-    testState = State([lambda a: a['metric1'] == 'val' and a['metric2'] == 'val2'])
 
-    foundState, idx = AnalyzeObservation({'metric1':'val', 'metric2':'val2'}, [testState])
+class PartialMDPModule(apps.framework_DMF.AdaptationModule):
 
-    observationTrace = pandas.DataFrame(columns=['metric1', 'metric2'], data=[['val', 'val2']])
+    def __init__(self, mdp:list, desiredObservationMetrics:list, logPath:str=None, logFileName:str=None, actionSpace:list=None, actionFields:dict=None):
+        """Partial-defined Markovian Decision Process system"""
+        super().__init__(desiredObservationMetrics=desiredObservationMetrics, logPath=logPath, logFileName=logFileName, actionSpace=actionSpace, actionFields=actionFields)
+        self.MDP = mdp
 
-    foundStates, observationTrace['state-id'] = AnalyzeTrace(observationTrace, [testState])
+    def DefineActionSpaceSubset(self, rawObservation:dict, observation:dict) -> list:
+        """Action space is defined by what state the system is currently in"""
 
-    print('')
+        # Get current State
+        currentState, _ = AnalyzeObservation(rawObservation, self.MDP)
 
+        return currentState.Actions.copy()
+
+    def DefineObservation(self, rawObservation:dict) -> list:
+        """Observation is provided by the MDP that defines the states"""
+
+        # Get current State based on metrics
+        currentState, id = AnalyzeObservation(rawObservation, self.MDP)
+
+        rawObservation['StateID'] = id
+
+        # Add to the observation, state id
+        newObv = super().DefineObservation(rawObservation)
+
+        newObv = currentState.AdjustMetrics(newObv)
+
+        return newObv

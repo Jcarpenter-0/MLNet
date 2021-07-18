@@ -16,41 +16,9 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def getCC() -> str:
-
-    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
-
-    ccsRaw = ccsRaw.decode()
-
-    # net.ipv4.tcp_congestion_control = cubic
-    ccRawPieces = ccsRaw.split('=')[-1]
-
-    ccRawPieces = ccRawPieces.lstrip()
-
-    ccRawPieces = ccRawPieces.replace('\n', '')
-
-    return ccRawPieces
-
-
-def getCCs() -> list:
-
-    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_available_congestion_control'])
-
-    ccsRaw = ccsRaw.decode()
-
-    # example result: net.ipv4.tcp_available_congestion_control = reno cubic
-    ccRawPieces = ccsRaw.split('=')[-1]
-
-    ccRawPieces = ccRawPieces.lstrip()
-
-    currentCongestionControlFlavors = ccRawPieces.split(' ')
-
-    return currentCongestionControlFlavors
-
-
 class Iperf3App(apps.App):
 
-    def TranslateActions(self, args:dict) -> dict:
+    def TranslateActions(self, args:dict) -> (dict, list):
 
         translatedActions = dict()
 
@@ -71,7 +39,7 @@ class Iperf3App(apps.App):
         if '-run-duration-seconds' in args.keys():
             translatedActions['-t'] = args['-run-duration-seconds']
 
-        return translatedActions
+        return translatedActions, None
 
     def Run(self, runArgs:dict) -> (dict, list):
 
@@ -92,11 +60,8 @@ class Iperf3App(apps.App):
 
         output = apps.ParseIperf3Output(outputRaw, runArgs)
 
-        # Add the action args
-        output.update(runArgs)
-
         if '-C' not in command:
-            output['-C'] = getCC()
+            output['-tcp-congestion-control'] = apps.getCC()
 
         return output, []
 

@@ -5,7 +5,7 @@ sys.path.insert(0, '../../')
 
 import numpy as np
 import agents
-import agents.agentServer
+import agents.framework_AgentServer
 
 
 # Some constants from Park and Pensieve's reward functions
@@ -95,12 +95,12 @@ class ABRControllerExperimentModule(agents.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, miscArgs = agents.agentServer.ParseDefaultServerArgs()
+    port, address, mode, learnerDir, loggingPath, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
     domainDF = ABRControllerExperimentModule(learnerDir + loggingPath)
 
     # Declare a server
-    server = agents.agentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), (address, port))
+    server = agents.framework_AgentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), (address, port))
 
     server.Run()

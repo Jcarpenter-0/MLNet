@@ -1,5 +1,5 @@
-import apps.daemon_process
-import apps.daemon_server
+import apps.framework_Daemon_process
+import apps.framework_Daemon_server
 import networks
 import subprocess
 import time
@@ -171,7 +171,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
             if runDaemonServer:
                 # run the daemon server
                 port = daemonPort
-                daemonArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort)
+                daemonArgs = apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort)
 
                 daemonCLIArgs = apps.ToCLIArgs(daemonArgs)
 
@@ -196,7 +196,7 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
                     os.makedirs(hostSpecificDir)
 
                 # run the daemon proc
-                mnProc.stdin.write('{} {} &\n'.format(host, apps.daemon_process.PrepareDaemonCLI(daemonServerWatchFilePath=hostSpecificDir, dirOffset=dirOffset)))
+                mnProc.stdin.write('{} {} &\n'.format(host, apps.framework_Daemon_process.PrepareDaemonCLI(daemonServerWatchFilePath=hostSpecificDir, dirOffset=dirOffset)))
                 mnProc.stdin.flush()
                 # Read for backgrounding
                 print('MiniNet: Waiting for MN to "background" a component, about 2 seconds')

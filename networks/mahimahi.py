@@ -7,8 +7,8 @@ import netifaces
 from typing import Tuple
 
 import networks
-import apps.daemon_server
-import apps.daemon_process
+import apps.framework_Daemon_server
+import apps.framework_Daemon_process
 
 
 def MakeMahiMahiLinkFile(bandwidth:int) -> list:
@@ -167,7 +167,7 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirO
         ipAddress = '{}'.format(ipLinePieces[9])
 
         # add the operation server command
-        mmCommands.extend(apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
+        mmCommands.extend(apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
     else:
         # create input dir
         try:
@@ -179,7 +179,7 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirO
             os.makedirs(inputDir)
 
         # add the proc daemon
-        mmCommands.extend(apps.daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
+        mmCommands.extend(apps.framework_Daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
 
     # run actual time to finish
     finalmmProc = subprocess.Popen(mmCommands,

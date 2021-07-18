@@ -16,38 +16,6 @@ sys.path.insert(0, DirOffset)
 import apps
 
 
-def getCC() -> str:
-
-    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
-
-    ccsRaw = ccsRaw.decode()
-
-    # net.ipv4.tcp_congestion_control = cubic
-    ccRawPieces = ccsRaw.split('=')[-1]
-
-    ccRawPieces = ccRawPieces.lstrip()
-
-    ccRawPieces = ccRawPieces.replace('\n', '')
-
-    return ccRawPieces
-
-
-def getCCs() -> list:
-
-    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_available_congestion_control'])
-
-    ccsRaw = ccsRaw.decode()
-
-    # example result: net.ipv4.tcp_available_congestion_control = reno cubic
-    ccRawPieces = ccsRaw.split('=')[-1]
-
-    ccRawPieces = ccRawPieces.lstrip()
-
-    currentCongestionControlFlavors = ccRawPieces.split(' ')
-
-    return currentCongestionControlFlavors
-
-
 class IperfApp(apps.App):
 
     def ParseOutput(self, rawData:bytes) -> dict:
@@ -64,20 +32,27 @@ class IperfApp(apps.App):
         if len(outputRaw) <= 0:
             raise Exception('No Iperf output')
 
-        dataDict['timestamp'] = output[0]
+        dataDict.update(apps.TimeStampDMF(value=output[0], unit='date-time',
+                                     traits=['application-level',
+                                             'day-of-week, day month-abbreviated year, hour:minute:second GMT']).ToDict())
+
         dataDict['source_addr'] = output[1]
         dataDict['source_port'] = output[2]
 
-        dataDict['dest_addr'] = output[3]
-        dataDict['dest_port'] = output[4]
+        dataDict.update(apps.TargetAddressDMF(value=output[3], unit='IP',traits=['application-level']).ToDict())
+        dataDict.update(apps.TargetPortDMF(value=int(output[4]), unit='Port',traits=['application-level']).ToDict())
 
-        dataDict['interval'] = output[6]
-        dataDict['transferred_bytes'] = int(output[7])
-        dataDict['bits_per_second'] = float(output[8])
+        dataDict.update(apps.PollRateDMF(value=float(output[6]), unit='second',traits=['application-level']).ToDict())
+
+        dataDict.update(apps.DataReceivedDMF(value=int(output[7]), unit='byte',
+                                    traits=['receiver', 'application-level']).ToDict())
+
+        dataDict.update(apps.ThroughputDMF(value=float(output[8]), unit='bits-per-second',
+                                      traits=['application-level', 'receiver']).ToDict())
 
         return dataDict
 
-    def TranslateActions(self, args:dict) -> dict:
+    def TranslateActions(self, args:dict) -> (dict, list):
 
         translatedActions = dict()
 
@@ -111,13 +86,10 @@ class IperfApp(apps.App):
 
         output = self.ParseOutput(outputRaw)
 
-        # Add the action args
-        output.update(runArgs)
-
         if '-Z' not in command:
-            output['-Z'] = getCC()
+            output['-tcp-congestion-control'] = apps.getCC()
 
-        return output
+        return output, None
 
 
 # Allow call to just run iperf with initial args

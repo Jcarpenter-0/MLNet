@@ -4,6 +4,7 @@ import sys
 import subprocess
 import time
 import numpy as np
+import apps.framework_DMF
 
 
 def ToPopenArgs(argDict:dict, replacer:str='~') -> list:
@@ -43,7 +44,7 @@ def PrepGeneralWrapperCall(commandFilePath:str,
     #The specifics of these parameters are realized at the application wrapper level where they are converted into runtime args
     commandArgs['-target-server-address'] = targetServerAddress
     commandArgs['-target-server-path'] = targetServerPath
-    commandArgs['-target--server-request-port'] = targetServerPort
+    commandArgs['-target-server-request-port'] = targetServerPort
     commandArgs['-agent-address'] = agentServerAddress
     commandArgs['-agent-port'] = agentServerPort
     commandArgs['-probing-approach'] = probingApproach
@@ -60,10 +61,16 @@ def PrepGeneralWrapperCall(commandFilePath:str,
         # remove the "none"s
         for key in commandArgs.copy():
             if commandArgs[key] is None:
-               del commandArgs[key]
+                print('Framework: Prepping call: removing {} {}'.format(key, commandArgs[key]))
+                del commandArgs[key]
 
     # Last n args are agent specific
-    commandList.append(json.dumps(commandArgs))
+    basicJson = json.dumps(commandArgs)
+
+    # add escaped escaped quotes to help the shell digest the json
+    basicJson = basicJson.replace('\"','\\\"')
+
+    commandList.append("\"{}\"".format(basicJson))
 
     return commandList
 
@@ -73,12 +80,43 @@ def ParseDefaultArgs(readArgs:list) -> dict:
 
     # Get the json formatted args dict
     rawArgs = readArgs[-1]
-
     args = json.loads(rawArgs)
 
-    print('App Args full: {}'.format(args))
+    #print('App Args full: {}'.format(args))
 
     return args
+
+
+def getCC() -> str:
+
+    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_congestion_control'])
+
+    ccsRaw = ccsRaw.decode()
+
+    # net.ipv4.tcp_congestion_control = cubic
+    ccRawPieces = ccsRaw.split('=')[-1]
+
+    ccRawPieces = ccRawPieces.lstrip()
+
+    ccRawPieces = ccRawPieces.replace('\n', '')
+
+    return ccRawPieces
+
+
+def getCCs() -> list:
+
+    ccsRaw = subprocess.check_output(['sysctl', 'net.ipv4.tcp_available_congestion_control'])
+
+    ccsRaw = ccsRaw.decode()
+
+    # example result: net.ipv4.tcp_available_congestion_control = reno cubic
+    ccRawPieces = ccsRaw.split('=')[-1]
+
+    ccRawPieces = ccRawPieces.lstrip()
+
+    currentCongestionControlFlavors = ccRawPieces.split(' ')
+
+    return currentCongestionControlFlavors
 
 
 def ParseTCPDump(filePath:str) -> dict:
@@ -174,7 +212,7 @@ def ParseTCPDump(filePath:str) -> dict:
 
     # Last - First Timestamps
     duration = abs(lastTimeSeconds - firstTimeSeconds)
-    dataDict.update(DurationDMF(value=duration, unit='second', traits=['network-level', 'link-sum']).ToDict())
+    dataDict.update(apps.framework_DMF.DurationDMF(value=duration, unit='second', traits=['network-level', 'link-sum']).ToDict())
 
     latencies = []
 
@@ -188,12 +226,12 @@ def ParseTCPDump(filePath:str) -> dict:
                 # Match found, put timebetween into list
                 latencies.append(abs(float(ack['timestamp-seconds'] - seq['timestamp-seconds'])))
 
-    dataDict.update(RoundTripTimeDMF(value=np.mean(latencies), unit='second', traits=['network-level', 'link-sum', 'average']).ToDict())
+    dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=np.mean(latencies), unit='second', traits=['network-level', 'link-sum', 'average']).ToDict())
 
     # Count duplicate sequence numbers (unique - all)
-    dataDict.update(LossDMF(value=len(sequenceNumbers) - len(np.unique(sequenceNumbers)), unit='packet', traits=['network-level', 'link-sum', 'difference-of-unique-sequence-numbers']).ToDict())
-    dataDict.update(DataSentDMF(value=np.sum(packetSizes), unit='packet', traits=['network-level', 'link-sum']).ToDict())
-    dataDict.update(ThroughputDMF(value=np.sum(packetSizes)/duration, unit='byte-per-second', traits=['network-level', 'link-sum']).ToDict())
+    dataDict.update(apps.framework_DMF.LossDMF(value=len(sequenceNumbers) - len(np.unique(sequenceNumbers)), unit='packet', traits=['network-level', 'link-sum', 'difference-of-unique-sequence-numbers']).ToDict())
+    dataDict.update(apps.framework_DMF.DataSentDMF(value=np.sum(packetSizes), unit='packet', traits=['network-level', 'link-sum']).ToDict())
+    dataDict.update(apps.framework_DMF.ThroughputDMF(value=np.sum(packetSizes)/duration, unit='byte-per-second', traits=['network-level', 'link-sum']).ToDict())
 
     return dataDict
 
@@ -214,16 +252,16 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
 
     startSection = output['start']
 
-    dataDict.update(TargetAddressDMF(value=startSection['connecting_to']['host'], unit='IP', traits=['application-level']).ToDict())
-    dataDict.update(TargetPortDMF(value=startSection['connecting_to']['port'], unit='Port', traits=['application-level']).ToDict())
+    dataDict.update(apps.framework_DMF.TargetAddressDMF(value=startSection['connecting_to']['host'], unit='IP', traits=['application-level']).ToDict())
+    dataDict.update(apps.framework_DMF.TargetPortDMF(value=startSection['connecting_to']['port'], unit='Port', traits=['application-level']).ToDict())
 
     dataDict['version'] = startSection['version']
 
-    dataDict.update(TimeStampDMF(value=startSection['timestamp']['time'], unit='date-time', traits=['application-level','day-of-week, day month-abbreviated year, hour:minute:second GMT']).ToDict())
-    dataDict.update(TimeStampDMF(value=startSection['timestamp']['timesecs'], unit='second', traits=['application-level','epoch-seconds']).ToDict())
-    dataDict.update(TCPMinimumSendSizeDMF(value=startSection['tcp_mss_default'], unit='byte', traits=['application-level', 'default']).ToDict())
-    dataDict.update(ProtocolDMF(value=startSection['test_start']['protocol'], unit='transport-layer', traits=['application-level', 'transport-layer']).ToDict())
-    dataDict.update(ParallelStreams(value=startSection['test_start']['num_streams'], unit='data-stream', traits=['application-level', 'transport-layer']).ToDict())
+    dataDict.update(apps.framework_DMF.TimeStampDMF(value=startSection['timestamp']['time'], unit='date-time', traits=['application-level','day-of-week, day month-abbreviated year, hour:minute:second GMT']).ToDict())
+    dataDict.update(apps.framework_DMF.TimeStampDMF(value=startSection['timestamp']['timesecs'], unit='second', traits=['application-level','epoch-seconds']).ToDict())
+    dataDict.update(apps.framework_DMF.TCPMinimumSendSizeDMF(value=startSection['tcp_mss_default'], unit='byte', traits=['application-level', 'default']).ToDict())
+    dataDict.update(apps.framework_DMF.ProtocolDMF(value=startSection['test_start']['protocol'], unit='transport-layer', traits=['application-level', 'transport-layer']).ToDict())
+    dataDict.update(apps.framework_DMF.ParallelStreamsDMF(value=startSection['test_start']['num_streams'], unit='tcp-stream', traits=['application-level', 'transport-layer']).ToDict())
 
     dataDict['blksize'] = startSection['test_start']['blksize']
     dataDict['omit'] = startSection['test_start']['omit']
@@ -231,22 +269,22 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
     dataDict['blocks'] = startSection['test_start']['blocks']
     dataDict['reverse'] = startSection['test_start']['reverse']
 
-    dataDict.update(DurationDMF(value=float(startSection['test_start']['duration']), unit='second', traits=['application-level']).ToDict())
+    dataDict.update(apps.framework_DMF.DurationDMF(value=float(startSection['test_start']['duration']), unit='second', traits=['application-level']).ToDict())
 
     endSection = output['end']
 
     sendSection = endSection['sum_sent']
 
-    dataDict.update(DurationDMF(value=float(sendSection['seconds']), unit='second', traits=['application-level', 'sender']).ToDict())
-    dataDict.update(DataSentDMF(value=float(sendSection['bytes']), unit='byte', traits=['sender', 'application-level']).ToDict())
-    dataDict.update(ThroughputDMF(value=float(sendSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'sender']).ToDict())
-    dataDict.update(LossDMF(value=float(sendSection['retransmits']), unit='retransmits', traits=['application-level', 'sender']).ToDict())
+    dataDict.update(apps.framework_DMF.DurationDMF(value=float(sendSection['seconds']), unit='second', traits=['application-level', 'sender']).ToDict())
+    dataDict.update(apps.framework_DMF.DataSentDMF(value=float(sendSection['bytes']), unit='byte', traits=['sender', 'application-level']).ToDict())
+    dataDict.update(apps.framework_DMF.ThroughputDMF(value=float(sendSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'sender']).ToDict())
+    dataDict.update(apps.framework_DMF.LossDMF(value=float(sendSection['retransmits']), unit='retransmits', traits=['application-level', 'sender']).ToDict())
 
     recSection = endSection['sum_received']
 
-    dataDict.update(DurationDMF(value=float(recSection['seconds']), unit='second', traits=['application-level', 'receiver']).ToDict())
-    dataDict.update(DataReceivedDMF(value=float(recSection['bytes']), unit='byte', traits=['receiver', 'application-level']).ToDict())
-    dataDict.update(ThroughputDMF(value=float(recSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'receiver']).ToDict())
+    dataDict.update(apps.framework_DMF.DurationDMF(value=float(recSection['seconds']), unit='second', traits=['application-level', 'receiver']).ToDict())
+    dataDict.update(apps.framework_DMF.DataReceivedDMF(value=float(recSection['bytes']), unit='byte', traits=['receiver', 'application-level']).ToDict())
+    dataDict.update(apps.framework_DMF.ThroughputDMF(value=float(recSection['bits_per_second']), unit='bits-per-second', traits=['application-level', 'receiver']).ToDict())
 
     # Stream dissection
     streamSection = endSection['streams']
@@ -274,171 +312,17 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
         avgRTTs.append(meanRTT)
 
     # Calculate macros
-    dataDict.update(RoundTripTimeDMF(value=float(np.mean(maxRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'maximum']).ToDict())
-    dataDict.update(RoundTripTimeDMF(value=float(np.mean(minRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'minimum']).ToDict())
-    dataDict.update(RoundTripTimeDMF(value=float(np.mean(avgRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'average']).ToDict())
+    dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(maxRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'maximum']).ToDict())
+    dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(minRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'minimum']).ToDict())
+    dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(avgRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'average']).ToDict())
 
-    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.max(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'maximum']).ToDict())
-    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=float(np.mean(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'average']).ToDict())
-    dataDict.update(DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.min(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'minimum']).ToDict())
+    dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.max(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'maximum']).ToDict())
+    dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=float(np.mean(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'average']).ToDict())
+    dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.min(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'minimum']).ToDict())
 
     dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
 
     return dataDict
-
-# =============================
-# Descriptive Metric Format
-# =============================
-
-
-class DescriptiveMetricFormat(object):
-
-    def __init__(self, name:str, unit:str, value=None, traits:list=[]):
-        """plain python object representation of the DMF"""
-        self.Name:str = name
-        # Traits: link-level, applicaton-level, user-generated
-        self.Traits:list = traits
-        # Units: bytes, bits, seconds, days, meters, farenhiet, packets, etc
-        self.Unit:str = unit
-        # Value
-        self.Value = value
-
-    def SerializeDMF(self, groupDeliminator:str=":") -> str:
-        """Serialize into simple "bar" delimited format for description"""
-        return '{}{}{}{}{}'.format(self.Name, groupDeliminator, '|'.join(self.Traits), groupDeliminator, '|'.join(self.Unit))
-
-    def ToDict(self) -> dict:
-        """Convert to Dict"""
-        return {self.SerializeDMF():self.Value}
-
-
-def ParseDMF(dmfLabel:str, dmfValue, groupDeliminator:str=":", subDeliminator:str="|") -> DescriptiveMetricFormat:
-    """From the DMF serial format, convert to in-process format"""
-    dmfPieces = dmfLabel.split(groupDeliminator)
-    metricName = dmfPieces[0]
-    traits = dmfPieces[1].split(subDeliminator)
-    units = dmfPieces[2].split(subDeliminator)
-
-    return DescriptiveMetricFormat(metricName, dmfValue, traits, units)
-
-
-#========================
-# Some core DMF Metrics
-# These help enforce the standard and provide quick definitions
-#========================
-
-
-class LatencyDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for latency"""
-        super().__init__(name="latency", unit=unit, value=value, traits=traits)
-
-
-class RoundTripTimeDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for rtt"""
-        super().__init__(name="round-trip-time", unit=unit, value=value, traits=traits)
-
-
-class LossDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for loss"""
-        super().__init__(name="loss", unit=unit, value=value, traits=traits)
-
-
-class ThroughputDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for throughput"""
-        super().__init__(name="throughput", unit=unit, value=value, traits=traits)
-
-
-class DurationDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for duration"""
-        super().__init__(name="duration", unit=unit, value=value, traits=traits)
-
-
-class DataSentDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for data"""
-        super().__init__(name="data-sent", unit=unit, value=value, traits=traits)
-
-
-class DataReceivedDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for data"""
-        super().__init__(name="data-received", unit=unit, value=value, traits=traits)
-
-
-class TargetAddressDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for address"""
-        super().__init__(name="target-address", unit=unit, value=value, traits=traits)
-
-
-class TargetPortDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for port"""
-        super().__init__(name="target-port", unit=unit, value=value, traits=traits)
-
-
-class TCPMinimumSendSizeDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for mss"""
-        super().__init__(name="tcp-minimum-send-size", unit=unit, value=value, traits=traits)
-
-
-class TimeStampDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for timestamp"""
-        super().__init__(name="timestamp", unit=unit, value=value, traits=traits)
-
-
-class ProtocolDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for protocol"""
-        super().__init__(name="protocol", unit=unit, value=value, traits=traits)
-
-
-class ParallelStreams(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for parallel connections"""
-        super().__init__(name="parallel-connections", unit=unit, value=value, traits=traits)
-
-
-class PollRateDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for application/system's activity rate"""
-        super().__init__(name="poll-rate", unit=unit, value=value, traits=traits)
-
-
-class BufferSizeDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for buffer size"""
-        super().__init__(name="buffer-size", unit=unit, value=value, traits=traits)
-
-
-class BufferCapacityDMF(DescriptiveMetricFormat):
-
-    def __init__(self, unit: str, value, traits:list=[]):
-        """Prefab for buffer capacity, specifically whats in the buffer"""
-        super().__init__(name="buffer-capacity", unit=unit, value=value, traits=traits)
-
 
 # =============================
 # Action Adaptive Systems
@@ -493,28 +377,28 @@ def RunApplication(application:App, runCount:int=10000):
         try:
 
             # If probing approach is passive, start it before the application runs
-            if(args['-probing-approach'] == 1):
+            if( '-probing-approach' in args.keys() and args['-probing-approach'] == 1):
 
                 probingProc = subprocess.Popen(['sudo', 'tcpdump', '-i', args['-probing-interface'], '-l', '-v', './link-monitoring.txt'])
 
             commands, gaps = application.TranslateActions(args)
-
-            print('Application: Translation Gaps: {}'.format(gaps))
-
             result, warnings = application.Run(commands)
 
-            print("Application: Warnings {}".format(warnings))
+            result.update(args)
+
+            if gaps is not None and len(gaps) > 0:
+                print('Application: Translation Gaps: {}'.format(gaps))
+
+            if warnings is not None and len(warnings) > 0:
+                print("Application: Warnings {}".format(warnings))
 
             # If probing approach is passive, end it for packaging
-            if (args['-probing-approach'] == 1):
-
+            if ('-probing-approach' in args.keys() and args['-probing-approach'] == 1):
                 probingProc.kill()
-
                 monitorData = ParseTCPDump('./link-monitoring.txt')
 
-
             # If probing approach is active, probe AFTER the application has done stuff
-            elif (args['-probing-approach'] == 2):
+            elif ('-probing-approach' in args.keys() and args['-probing-approach'] == 2):
                 probingProc = subprocess.Popen(
                     ['iperf3', '-c', args['-probing-interface'], '-J', '--logfile', './link-monitoring.json'])
 
@@ -529,22 +413,22 @@ def RunApplication(application:App, runCount:int=10000):
                 iperfJSFP.close()
 
             # Format resultant data into sending form
-            collectedData = {'application-data': result}
+            collectedData = result
 
             # Add Gap and Warning Data
-            collectedData['application-warnings'] = warnings
-            collectedData['application-gaps'] = gaps
+            #collectedData['application-warnings'] = warnings.extend(gaps)
+            #collectedData['command-issued'] = args
 
             # Add monitoring data
             if monitorData is not None:
-                collectedData['monitor-data'] = monitorData
+                collectedData.update(monitorData)
 
             if args['-agent-address'] is not None:
 
                 # Send to agent, and get new action
                 jsonData = json.dumps(collectedData)
 
-                response = requests.post('http:{}:{}/'.format(args['-agent-address'], args['-agent-port']), data=jsonData)
+                response = requests.post('http://{}:{}/'.format(args['-agent-address'], args['-agent-port']), data=jsonData)
 
                 respDict = json.loads(response.content.decode())
 
@@ -563,6 +447,7 @@ def RunApplication(application:App, runCount:int=10000):
             # Refresh retries
             retriesRemaining = retryCount
         except KeyboardInterrupt as inter:
+            fullFailure = True
             raise inter
         except subprocess.CalledProcessError as ex:
             exception = True

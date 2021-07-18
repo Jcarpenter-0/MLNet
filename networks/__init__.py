@@ -1,7 +1,7 @@
 import netifaces
 
-import apps.daemon_process
-import apps.daemon_server
+import apps.framework_Daemon_process
+import apps.framework_Daemon_server
 import subprocess
 import requests
 import time
@@ -124,7 +124,7 @@ class Node(object):
                     raise Exception("Framework: Problem raising process on node {} : {}".format(self.IpAddress, response.text))
 
             else:
-                raise Exception('Framework: Node {} has no daemon'.format(self.IpAddress))
+                print('Framework: Node {} has no daemon'.format(self.IpAddress))
 
             time.sleep(interApplicationDelay)
 
@@ -204,11 +204,11 @@ class Node(object):
             print('Framework: Node {} input tree removed'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=None, inputDir:str='./daemon-proc-input/lh/') -> (Node, str, str):
+def SetupLocalHost(daemonServerPort=None, dirOffset='./../../', ipAddress:str='127.0.0.1', inputDir:str='./daemon-proc-input/lh/0/') -> (Node, str, str):
 
     # run daemon server
     if daemonServerPort is not None:
-        opServerArgs = apps.daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
+        opServerArgs = apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
     else:
         # run daemon proc instead
         try:
@@ -219,7 +219,7 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=No
             shutil.rmtree(inputDir)
             os.makedirs(inputDir)
 
-        opServerArgs = apps.daemon_process.PrepareDaemonArgs(inputDir, dirOffset=dirOffset)
+        opServerArgs = apps.framework_Daemon_process.PrepareDaemonArgs(inputDir, dirOffset=dirOffset)
 
     opProc = subprocess.Popen(opServerArgs,
     #stdout=subprocess.PIPE,
@@ -229,4 +229,4 @@ def SetupLocalHost(daemonServerPort=7080, dirOffset='./../../', ipAddress:str=No
 
     print('Framework: Localhost Node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
 
-    return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc), '127.0.0.1', netifaces.interfaces()[0]
+    return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc, inputDir=inputDir), '127.0.0.1', netifaces.interfaces()[0]
