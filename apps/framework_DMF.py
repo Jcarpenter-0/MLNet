@@ -27,6 +27,7 @@ class DescriptiveMetricFormat(object):
         # For identifying issues
         self.Warnings = []
         self.OpPath = []
+        self.MatchDegree:float = None
 
     def GetDMFLabel(self, groupDeliminator:str= ":") -> str:
         """Serialize into simple "bar" delimited format for description"""
@@ -225,108 +226,147 @@ def __resolveMetricPath(startMetric:str, endMetric:str, conversionTree:dict=conv
     return path
 
 
-def __resolveDMFConversion(desiredMetric:DescriptiveMetricFormat, observationDMFs: List[DescriptiveMetricFormat], topLevelDesiredMetric:DescriptiveMetricFormat=None, conversionTree:dict=conversionTree) -> DescriptiveMetricFormat:
-    """"""
-    # check if any existing DMF's match the desired at the top level
+def __findMatchingUnits(soughtUnit:str, soughtTraits:list, compareDMFs:List[DescriptiveMetricFormat]) -> list:
+    """Look through a list of observation DMFs and try to find ones with the same unit that match, evaluate the match"""
+
     matches = []
 
-    for dmfMetric in observationDMFs:
-        if dmfMetric.Name == desiredMetric.Name:
+    for compareDMF in compareDMFs:
+        if compareDMF.Unit == soughtUnit:
+
+            matchDegree = ((math.ceil(len(set(compareDMF.Traits) - set(soughtTraits))))/1)*100
+
+            matches.append((compareDMF, matchDegree))
+
+    matches.sort(key=lambda x: x[1])
+
+    return matches
+
+
+def __compareDMFs(dmf1:DescriptiveMetricFormat, dmf2:DescriptiveMetricFormat) -> float:
+    """Do a basic comparison between DMFs"""
+    return ((math.ceil(len(set(dmf1.Traits) - set(dmf2.Traits))))/1)*100
+
+
+def __compareDMFtoDMFs(srcdmf:DescriptiveMetricFormat, compareDMFs:List[DescriptiveMetricFormat]) -> list:
+    """Given a target DMF try create comparison across others"""
+
+    matches = []
+
+    for dmfMetric in compareDMFs:
+        if dmfMetric.Name == srcdmf.Name:
+
             # Append the metric itself and the "trait match" degree (expressed as a number of traits asked for vs in metric)
-            if topLevelDesiredMetric is not None:
-                matchDegree = math.ceil(len(set(topLevelDesiredMetric.Traits) - set(dmfMetric.Traits)))
-            else:
-                matchDegree = math.ceil(len(set(desiredMetric.Traits) - set(dmfMetric.Traits)))
+            matchDegree = math.ceil(len(set(srcdmf.Traits) - set(dmfMetric.Traits)))
 
             matches.append((dmfMetric, matchDegree))
 
-    returnDMF = None
+    matches.sort(key=lambda x: x[1])
 
-    if len(matches) > 0:
-        # sort matches by  match degree
-        matches.sort(key=lambda x:x[1])
+    return matches
 
-        returnDMF = matches[0][0]
 
-        # ensure consistency of unit
-        path = __resolveMetricPath(returnDMF.Unit, desiredMetric.Unit, conversionTree)
+def __processConversionPath(srcDMF:DescriptiveMetricFormat, trgDMF:DescriptiveMetricFormat, observationDMFs: List[DescriptiveMetricFormat], conversionTree:dict=conversionTree) -> (DescriptiveMetricFormat, list):
+    """Perform the process on the conversion path between point A and point B.
+    :returns Resolved Metric (if found), list of warnings during operation
+    """
+    path = __resolveMetricPath(srcDMF.Unit, trgDMF.Unit, conversionTree)
 
-        # run ops along path
-        for stepNum in range(0,len(path)-1):
+    warnings = []
+    retDMF = None
+
+    if len(path) > 0:
+
+        retDMF = copy.copy(srcDMF)
+        retDMF.Name = trgDMF.Name
+
+        # run ops along path, converting the unit
+        for stepNum in range(0, len(path) - 1):
             step = path[stepNum]
             nextStep = path[stepNum + 1]
             operation = conversionTree[step][nextStep]
-
-            returnDMF.Value = operation(returnDMF.Value, observationDMFs, None, conversionTree)
-            returnDMF.Unit = nextStep
-            returnDMF.OpPath.append(step)
+            retDMF.Value = operation(retDMF.Value, observationDMFs, retDMF, conversionTree)
+            retDMF.Unit = nextStep
+            retDMF.OpPath.append(step)
+            retDMF.OpPath.append(nextStep)
 
     else:
-        # have none, must then convert other metrics to this one
+
+        # check if any conversion was needed at all
+        if srcDMF.Unit == trgDMF.Unit:
+            # already present
+            retDMF = srcDMF
+        else:
+            warnings.append("No Path from {}:{} to {}:{}".format(srcDMF.Name, srcDMF.Unit, trgDMF.Name, trgDMF.Unit))
+
+    return retDMF, warnings
+
+
+def __resolveDMFConversion(desiredMetric:DescriptiveMetricFormat, observationDMFs: List[DescriptiveMetricFormat], topLevelDesiredDMF:DescriptiveMetricFormat, conversionTree:dict=conversionTree) -> DescriptiveMetricFormat:
+    """Given a desired metric, try to find the closest metric that can be converted, or find metrics that can generate the desired.
+    :returns resolved metric (if able), the path these operations took, and the warnings
+    """
+    returnDMF = None
+
+    # Try to find an metric that just requires a metric conversion
+    matches = __compareDMFtoDMFs(desiredMetric, observationDMFs)
+
+    if len(matches) > 0:
+        # sort matches by match degree, and
+        returnDMF = matches[0][0]
+        returnDMF, unitConversionWarnings = __processConversionPath(returnDMF, desiredMetric, observationDMFs)
+        topLevelDesiredDMF.Warnings.extend(unitConversionWarnings)
+        if returnDMF is not None:
+            if len(returnDMF.OpPath) > 0:
+                topLevelDesiredDMF.OpPath.append(returnDMF.OpPath)
+
+            topLevelDesiredDMF.OpPath.append("{}({}:{})".format(returnDMF.Name, returnDMF.Traits, returnDMF.Unit))
+            topLevelDesiredDMF.Traits.extend(returnDMF.Traits)
+    else:
+        # have no matches, must then convert other metrics to this one
         metricAlternatives = __createConversionBFSTree(desiredMetric.Unit, conversionTree)
 
-        # try to find the closest alternative
-        returnDMF = desiredMetric
+        # Check each alternative
+        alternativeKeyIndex = 0
+        keepLooking = True
 
-        for key in metricAlternatives:
+        while keepLooking and alternativeKeyIndex < len(metricAlternatives):
 
-            matchingUnits = []
+            alternateMetricKey = list(metricAlternatives)[alternativeKeyIndex]
 
-            # Find metrics that match the unit needed
-            for observationDMF in observationDMFs:
+            # look through the observation for anything with matching units
+            matches = __findMatchingUnits(alternateMetricKey, desiredMetric.Traits, observationDMFs)
 
-                if observationDMF.Unit in key:
+            # try all the possible matches (the first one that resolves all the way, just take it)
+            for matchDMF, matchDegree in matches:
 
-                    if topLevelDesiredMetric is not None:
-                        matchDegree = math.ceil(len(set(topLevelDesiredMetric.Traits) - set(observationDMF.Traits)))
-                    else:
-                        matchDegree = math.ceil(len(set(desiredMetric.Traits) - set(observationDMF.Traits)))
-
-                    matchingUnits.append((observationDMF, matchDegree))
-
-            nextStepLabel = None
-
-            matchingUnits.sort(key=lambda x: x[1])
-
-            for observationDMF, matchDegree in matchingUnits:
                 try:
 
-                    # Found a metric, now attempt to convert it into what we need
-                    path = __resolveMetricPath(observationDMF.Unit, desiredMetric.Unit, conversionTree)
+                    returnDMF, alternateMetricWarnings = __processConversionPath(matchDMF, desiredMetric, observationDMFs)
+                    topLevelDesiredDMF.Warnings.extend(alternateMetricWarnings)
 
-                    # run ops along path
-                    for stepNum in range(0, len(path) - 1):
-                        step = path[stepNum]
-                        nextStep = path[stepNum + 1]
-                        nextStepLabel = nextStep
-                        operation = conversionTree[step][nextStep]
-
-                        #currentTraits = copy.copy(returnDMF.Traits)
-
-                        # How do we resolve the "duration" check?
-                        returnDMF.Value = operation(observationDMF.Value, observationDMFs, topLevelDesiredMetric, conversionTree)
-                        returnDMF.Unit = nextStep
-                        #returnDMF.Traits.extend(observationDMF.Traits)
-                        returnDMF.OpPath.append(step)
-                        dmfLog = 'Want {} {} in {} - Have {} {} in {} use? \"{} to {}:{}\"'.format(desiredMetric.Name, desiredMetric.Traits, desiredMetric.Unit, observationDMF.Name, observationDMF.Traits, observationDMF.Unit, step, nextStep, returnDMF.Traits)
-                        print('DMF:' + dmfLog)
-                        returnDMF.Warnings.append(dmfLog)
-
-                    return returnDMF
+                    if returnDMF is None:
+                        # Could not resolve, move onto the next
+                        raise Exception()
+                    else:
+                        # Found one, stop looking further
+                        topLevelDesiredDMF.OpPath.extend(returnDMF.OpPath)
+                        keepLooking = False
+                        break
 
                 except Exception as ex:
-                    print('DMF: Cannot use alternative {} to {}'.format(key, nextStepLabel))
+                    print('DMF: Cannot use alternative {} to {}'.format(alternateMetricKey, desiredMetric.Unit))
                     print(ex)
 
-    if returnDMF is not None and returnDMF.Value is None:
-        returnDMF = None
+            alternativeKeyIndex += 1
 
     return returnDMF
 
 
-def _getMetrics(desiredMetricDMFs:list, observation:dict, conversionTree:dict=conversionTree) -> List[DescriptiveMetricFormat]:
+def _getMetrics(desiredMetricDMFs:List[DescriptiveMetricFormat], observation:dict, conversionTree:dict=conversionTree, defaultValue=0) -> List[DescriptiveMetricFormat]:
     """Find a metric (or convert a metric) in an observation.
     Will construct the connectives from the metric, then try to find the closest metric from the observation
+    :returns list of resolved metrics, list of unresolved desires, warnings
     """
 
     # Convert observation to DMF list, for matching metric name of desired
@@ -336,24 +376,29 @@ def _getMetrics(desiredMetricDMFs:list, observation:dict, conversionTree:dict=co
 
         try:
             newDMF = ParseDMF(key, observation[key])
-
             dmfMetrics.append(newDMF)
+
         except Exception as ex:
             print('DMF: Error Parsing a metric {}'.format(key))
 
     resolvedMetrics = []
 
     for desiredMetric in desiredMetricDMFs:
-        resolvedMetric = __resolveDMFConversion(desiredMetric, dmfMetrics, None, conversionTree)
+        copiedDesireMetric = DescriptiveMetricFormat(desiredMetric.Name, desiredMetric.Unit)
+
+        if desiredMetric.Value is not None:
+            copiedDesireMetric.Value = desiredMetric.Value
+        else:
+            copiedDesireMetric.Value = defaultValue
+
+        resolvedMetric = __resolveDMFConversion(desiredMetric, dmfMetrics, copiedDesireMetric, conversionTree)
 
         if resolvedMetric is None:
             # Copy so we can assign the "default" fill in value
-            copiedDesireMetric = copy.copy(desiredMetric)
-
-            copiedDesireMetric.Value = 0
-
             resolvedMetrics.append(copiedDesireMetric)
+            copiedDesireMetric.Warnings.append("Default Value of {} Assigned".format(copiedDesireMetric.Value))
         else:
+            resolvedMetric.MatchDegree = __compareDMFs(resolvedMetric, desiredMetric)
             resolvedMetrics.append(resolvedMetric)
 
     return resolvedMetrics
