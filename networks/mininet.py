@@ -58,7 +58,7 @@ class MiniNetTopology:
         return cmdList
 
 
-class MiniNetNetworkModule(networks.NetworkModule):
+class MiniNetNetworkModule(networks.Network):
 
     def __init__(self, networkProcs:list=[], nodes:list=[]):
         super().__init__(networkProcs, nodes)
@@ -77,7 +77,7 @@ class MiniNetNetworkModule(networks.NetworkModule):
         print('MiniNet: Cooled')
 
 
-def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/', excessiveBlanks:int=30) -> networks.NetworkModule:
+def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, daemonPort=8081, dirOffset='./', skipHostPrefix='s', inputDir:str='./daemon-proc-input/mn/', excessiveBlanks:int=30) -> networks.Network:
     """Setup a mininet network"""
 
     mnCommand = topology.GetCLI()

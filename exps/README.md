@@ -27,3 +27,8 @@ POST :
  * Stop all processes or just one by passing specific proc id.
 
 <code>POST '/processStop/':    '(optional) \<processID\>'</code>
+
+
+### Troubleshooting/Info
+* https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
+* https://stackoverflow.com/questions/22163422/using-python-to-open-a-shell-environment-run-a-command-and-exit-environment

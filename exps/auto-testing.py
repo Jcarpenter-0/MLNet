@@ -37,7 +37,7 @@ def RunExperiment(experimentConfig:dict):
                                            networkArgs=experimentConfig['network-configs'], tags=experimentConfig['tags'])
 
     # Execute the test
-    exps.runExperimentUsingFramework(networkModule, int(experimentConfig['test-duration-seconds']))
+    exps.RunExperimentUsingFramework(networkModule, int(experimentConfig['test-duration-seconds']))
 
 
 if os.path.isdir(experimentPath):

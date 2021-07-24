@@ -27,6 +27,22 @@ def ToPopenArgs(argDict:dict, replacer:str='~') -> list:
     return cmdList
 
 
+def _prepGeneralWrapperCall(commandFilePath:str, args:dict, dirOffset:str='./../../') -> list:
+    """Takes a dict of GAF formatted commands, and unpacks them into a command line ready list"""
+
+    commandList = ['python3', '{}{}'.format(dirOffset, commandFilePath)]
+
+    # Last n args are agent specific
+    basicJson = json.dumps(args)
+
+    # add escaped escaped quotes to help the shell digest the json
+    basicJson = basicJson.replace('\"', '\\\"')
+
+    commandList.append("\"{}\"".format(basicJson))
+
+    return commandList
+
+
 def PrepGeneralWrapperCall(commandFilePath:str,
                            targetServerAddress:str=None, targetServerPort:int=None, targetServerPath:str=None,
                            agentServerAddress:str=None, agentServerPort:int=None,
@@ -35,8 +51,6 @@ def PrepGeneralWrapperCall(commandFilePath:str,
                            additionalArgs:dict=None, dirOffset:str='./../../', removeNones:bool=True) -> list:
     """Using the "general" language of parameters create a process call friendly command.
     Any "parameter" that overlaps with two or more applications idealily should bere."""
-
-    commandList = ['python3', '{}{}'.format(dirOffset, commandFilePath)]
 
     commandArgs = dict()
 
@@ -64,15 +78,7 @@ def PrepGeneralWrapperCall(commandFilePath:str,
                 print('Framework: Prepping call: removing {} {}'.format(key, commandArgs[key]))
                 del commandArgs[key]
 
-    # Last n args are agent specific
-    basicJson = json.dumps(commandArgs)
-
-    # add escaped escaped quotes to help the shell digest the json
-    basicJson = basicJson.replace('\"','\\\"')
-
-    commandList.append("\"{}\"".format(basicJson))
-
-    return commandList
+    return _prepGeneralWrapperCall(commandFilePath, commandArgs, dirOffset)
 
 
 def ParseDefaultArgs(readArgs:list) -> dict:

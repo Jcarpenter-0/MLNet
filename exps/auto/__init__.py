@@ -66,13 +66,13 @@ def SetupTestPlan(configDesires:dict) ->(list, float, list, list):
 
 class __applicationModuleRegister(__registryModule):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.Network, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
         return NotImplementedError
 
 
 class __iperfApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.Network, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
         """Setup a client and server iperf pair. Will assume first and last nodes are the server and client"""
 
         firstNode:networks.Node = network.Nodes[0]
@@ -104,7 +104,7 @@ class __iperfApplicationModuleRegister(__applicationModuleRegister):
 
 class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.Network, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
         firstNode: networks.Node = network.Nodes[0]
         lastNode: networks.Node = network.Nodes[-1]
 
@@ -125,7 +125,7 @@ class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
             iperfClientArgs.append(setupArgs['parallel connections'])
 
         serverArg = ['iperf3', '-s', '-i', '0']
-        clientArg = apps.PrepWrapperCall('{}apps/Iperf3.py'.format(dirOffset), iperfClientArgs, 100000,
+        clientArg = apps.PrepGeneralWrapperCall('{}apps/Iperf3.py'.format(dirOffset), iperfClientArgs, 100000,
                                          'http://{}:{}'.format(firstNode.IpAddress, learner.LearnerPort))
 
         firstNode.AddApplication(learner.ToArgs())
@@ -135,7 +135,7 @@ class __iperf3ApplicationModuleRegister(__applicationModuleRegister):
 
 class __pingApplicationModuleRegister(__applicationModuleRegister):
 
-    def Setup(self, setupArgs:dict, network:networks.NetworkModule, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
+    def Setup(self, setupArgs:dict, network:networks.Network, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../'):
         firstNode: networks.Node = network.Nodes[0]
         lastNode: networks.Node = network.Nodes[-1]
 
@@ -159,14 +159,14 @@ class __pingApplicationModuleRegister(__applicationModuleRegister):
 
 class __networkModuleRegister(__registryModule):
 
-    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.Network:
         """The call to setup the network, should result in a running network awaiting application calls"""
         return NotImplementedError
 
 
 class __mahiMahiNetworkModuleRegister(__networkModuleRegister):
 
-    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.Network:
         """Autobuilder method for creating a mahi mahi network"""
 
         shellList = []
@@ -187,14 +187,14 @@ class __mahiMahiNetworkModuleRegister(__networkModuleRegister):
 
         hostNode = networks.SetupLocalHost(dirOffset=dirOffset)
 
-        mmModule = networks.NetworkModule(nodes=[hostNode, node])
+        mmModule = networks.Network(nodes=[hostNode, node])
 
         return mmModule
 
 
 class __miniNetNetworkModuleRegister(__networkModuleRegister):
 
-    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.NetworkModule:
+    def Setup(self, setupArgs:dict, learner:agents.framework_AgentServer.AgentWrapper, dirOffset='../../') -> networks.Network:
         """Setup a mininet network, this will utilize many assumptions for the sake of speed,
          lower grain functionality is still easily doable via the component pieces."""
 
@@ -273,7 +273,7 @@ def __registerModules(envManifestFilePath:str='modules.csv', mainDelimister=',',
     return modules
 
 
-def autoBuildEnv(learner:agents.framework_AgentServer.AgentWrapper, soughtMetrics:list=[], networkArgs:dict={}, tags:list=[], fit:str= 'best', envManifestFilePath:str= 'modules.csv', dirOffset='../../', skipApps=False) -> networks.NetworkModule:
+def autoBuildEnv(learner:agents.framework_AgentServer.AgentWrapper, soughtMetrics:list=[], networkArgs:dict={}, tags:list=[], fit:str= 'best', envManifestFilePath:str= 'modules.csv', dirOffset='../../', skipApps=False) -> networks.Network:
     """Attempt to build an environment for you based on what type of fit
     :return list of Nodes"""
 

@@ -1,57 +1,25 @@
 import netifaces
-
-import apps.framework_Daemon_process
-import apps.framework_Daemon_server
-import subprocess
 import requests
 import time
 import json
-import os
 import shutil
+import subprocess
 
+# Setup the dir
+DirOffset = '../../'
 
-class NetworkModule(object):
+import os
+import sys
 
-    def __init__(self, networkProcs:list=[], nodes:list=[]):
-        """A real or simulated network comprised of real or simulated nodes"""
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, DirOffset)
 
-        # Procs for running the network (sim focused, real networks will not likely have this)
-        self.NetworkProcs:list = networkProcs
+import apps.framework_Daemon_process
+import apps.framework_Daemon_server
 
-        # List of Node objects (real or simulated)
-        self.Nodes:list = nodes
-
-    def StartNodes(self, interNodeDelay=0, interApplicationDelay=2):
-        """Start all the nodes's applications"""
-
-        for node in self.Nodes:
-            node.StartApplications(interApplicationDelay)
-            time.sleep(interNodeDelay)
-
-    def StopNodes(self, interNodeDelay=0):
-        """Only stop the applications running on the nodes"""
-        for node in self.Nodes:
-            node.StopApplications()
-            time.sleep(interNodeDelay)
-
-    def Shutdown(self, killTimeout=2):
-        """Shutdown all the processes on the nodes, and the network itself"""
-
-        # Shutdown each node
-        for node in self.Nodes:
-            node.ShutdownNode(killTimeout)
-
-        # iterate over network procs to shut them down
-        for proc in self.NetworkProcs:
-            print('Framework: Killing Network Proc {}'.format(proc.pid))
-            proc.kill()
-            try:
-                proc.wait(killTimeout)
-            except Exception as timeout:
-                proc.kill()
-                proc.wait()
-
-        print('Framework: Network Shutdown')
+# ===================================
+# Network Abstractions
+# ===================================
 
 
 class Node(object):
@@ -204,8 +172,62 @@ class Node(object):
             print('Framework: Node {} input tree removed'.format(self.IpAddress))
 
 
-def SetupLocalHost(daemonServerPort=None, dirOffset='./../../', ipAddress:str='127.0.0.1', inputDir:str='./daemon-proc-input/lh/0/') -> (Node, str, str):
+class Network(object):
 
+    def __init__(self, networkProcs:list=[], nodes:list=[]):
+        """A real or simulated network comprised of real or simulated nodes. This is an abstraction intended for organizational purposes in experiment scripting"""
+
+        # Procs for running the network (sim focused, real networks will not likely have this)
+        self.NetworkProcs:list = networkProcs
+
+        # List of Node objects (real or simulated)
+        self.Nodes:list = nodes
+
+    def StartNodes(self, interNodeDelay=0, interApplicationDelay=2):
+        """Start all the nodes's applications"""
+
+        for node in self.Nodes:
+            node.StartApplications(interApplicationDelay)
+            time.sleep(interNodeDelay)
+
+    def StopNodes(self, interNodeDelay=0):
+        """Only stop the applications running on the nodes"""
+        for node in self.Nodes:
+            node.StopApplications()
+            time.sleep(interNodeDelay)
+
+    def Shutdown(self, killTimeout=2):
+        """Shutdown all the processes on the nodes, and the network itself"""
+
+        # Shutdown each node
+        for node in self.Nodes:
+            node.ShutdownNode(killTimeout)
+
+        # iterate over network procs to shut them down
+        for proc in self.NetworkProcs:
+            print('Framework: Killing Network Proc {}'.format(proc.pid))
+            proc.kill()
+            try:
+                proc.wait(killTimeout)
+            except Exception as timeout:
+                proc.kill()
+                proc.wait()
+
+        print('Framework: Network Shutdown')
+
+
+# ===================================
+# Network Setup
+# ===================================
+
+
+# ====================================
+# Localhost Network Setup API calls
+# ====================================
+
+
+def SetupLocalHost(daemonServerPort=None, dirOffset='./../../', ipAddress:str='127.0.0.1', inputDir:str='./daemon-proc-input/lh/0/') -> (Node, str, str):
+    """Setup a localhost daemon, return the node, ipaddress, and reachable interface"""
     # run daemon server
     if daemonServerPort is not None:
         opServerArgs = apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonServerPort)
@@ -230,3 +252,4 @@ def SetupLocalHost(daemonServerPort=None, dirOffset='./../../', ipAddress:str='1
     print('Framework: Localhost Node: http://{}:{}/ - {}'.format(ipAddress, daemonServerPort, opProc))
 
     return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc, inputDir=inputDir), '127.0.0.1', netifaces.interfaces()[0]
+

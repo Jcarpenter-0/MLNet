@@ -1,26 +1,28 @@
 import numpy as np
 import subprocess
-import os
 import shutil
 import netifaces
 
 from typing import Tuple
 
+
+# Setup the dir
+DirOffset = '../../'
+
+import os
+import sys
+
+sys.path.insert(0, os.getcwd())
+sys.path.insert(0, DirOffset)
+# Hack for overcoming some dir issues
+
 import networks
 import apps.framework_Daemon_server
 import apps.framework_Daemon_process
 
-
-def MakeMahiMahiLinkFile(bandwidth:int) -> list:
-    """Make a mahimahi link file for use in the mm-link shell. This code is almost verbatim taken from the Park project by MIT."""
-
-    linkLines = []
-
-    lines = bandwidth // 12
-    for _ in range(lines):
-        linkLines.append('1\n')
-
-    return linkLines
+# ====================================
+# Network Classes
+# ====================================
 
 
 class MahiMahiShell():
@@ -53,7 +55,7 @@ class MahiMahiShell():
 
 class MahiMahiDelayShell(MahiMahiShell):
 
-    def __init__(self, delayMS=0, uplinkLogFilePath:str=None, downLinkLogFilePath:str=None):
+    def __init__(self, delayMS=0, uplinkLogFilePath: str = None, downLinkLogFilePath: str = None):
         super().__init__()
         self.Command = 'mm-delay'
         self.Args.append(delayMS)
@@ -70,7 +72,8 @@ class MahiMahiDelayShell(MahiMahiShell):
 
 class MahiMahiLossShell(MahiMahiShell):
 
-    def __init__(self, lossPercentage=0.0, linkDirection='uplink', uplinkLogFilePath:str=None, downLinkLogFilePath:str=None):
+    def __init__(self, lossPercentage=0.0, linkDirection='uplink', uplinkLogFilePath: str = None,
+                 downLinkLogFilePath: str = None):
         super().__init__()
         self.Command = 'mm-loss'
         self.Args.append(linkDirection)
@@ -84,20 +87,22 @@ class MahiMahiLossShell(MahiMahiShell):
         if downLinkLogFilePath is not None:
             self.Args.append('--downlink-log')
             self.Args.append('{}'.format(downLinkLogFilePath))
-        
+
     def GetParaString(self):
         paraString = super(MahiMahiLossShell, self).GetParaString()
 
-        paraString = paraString.replace('.','')
+        paraString = paraString.replace('.', '')
 
-        paraString = paraString.replace('/','')
+        paraString = paraString.replace('/', '')
 
         return paraString
 
 
 class MahiMahiLinkShell(MahiMahiShell):
 
-    def __init__(self, upLinkTraceFilePath, downLinkTraceFilePath, uplinkLogFilePath:str=None, downLinkLogFilePath:str=None, uplinkQueue:str=None, uplinkQueueArgs:str=None, downlinkQueue:str=None, downlinkQueueArgs:str=None):
+    def __init__(self, upLinkTraceFilePath, downLinkTraceFilePath, uplinkLogFilePath: str = None,
+                 downLinkLogFilePath: str = None, uplinkQueue: str = None, uplinkQueueArgs: str = None,
+                 downlinkQueue: str = None, downlinkQueueArgs: str = None):
         super().__init__()
         self.Command = 'mm-link'
         self.Args.append(upLinkTraceFilePath)
@@ -127,14 +132,18 @@ class MahiMahiLinkShell(MahiMahiShell):
     def GetParaString(self):
         paraString = super(MahiMahiLinkShell, self).GetParaString()
 
-        paraString = paraString.replace('.','')
+        paraString = paraString.replace('.', '')
 
-        paraString = paraString.replace('/','')
+        paraString = paraString.replace('/', '')
 
         return paraString
 
 
-def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
+# ====================================
+# Setup API calls
+# ====================================
+
+def SetupMahiMahiNode(mmShellsList:list, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
     """
         Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
     :param mmShellsList:
@@ -193,6 +202,29 @@ def SetupMahiMahiNode(mmShellsList, runDaemonServer=False, daemonPort=8081, dirO
     node = networks.Node(ipAddress=ipAddress, nodeProc=finalmmProc, daemonPort=daemonPort, inputDir=inputDir)
 
     return node, '100.64.0.1', netifaces.interfaces()[-1]
+
+
+def SetupMahiMahiNodeQuick(configs:dict) -> (networks.Node, list, float, list):
+    """Given a set of configurations try to fit as many as possible"""
+
+
+    return None, [], 0.0, []
+
+# ====================================
+# Attendant calls
+# ====================================
+
+
+def MakeMahiMahiLinkFile(bandwidth:int) -> list:
+    """Make a mahimahi link file for use in the mm-link shell. This code is almost verbatim taken from the Park project by MIT."""
+
+    linkLines = []
+
+    lines = bandwidth // 12
+    for _ in range(lines):
+        linkLines.append('1\n')
+
+    return linkLines
 
 
 def ParseMMLogFile(logFilePath:str, timeGrouping:int=0) -> list:
@@ -321,5 +353,3 @@ def ParseMacroMMLogFileToData(logFilePath:str, timeGrouping:int=0) -> list:
 
     return dataLines
 
-# https://eli.thegreenplace.net/2017/interacting-with-a-long-running-child-process-in-python/
-# https://stackoverflow.com/questions/22163422/using-python-to-open-a-shell-environment-run-a-command-and-exit-environment
