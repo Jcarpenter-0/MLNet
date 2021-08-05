@@ -1,0 +1,16 @@
+{
+  "repetitions": 0,
+  "duration": 0,
+  "agents": [
+    {"agents/tcp-flavor-selection/tcp-flavor-selection.py": {"training": true, "log-path": "", "log-file-name": "test.csv"}}
+  ],
+  "environment": {
+    "applications": [
+      {"app":null, "traits":["trait1"], "args": {}},
+      {"app":"apps/browser_selenium_firefox.py", "traits":null, "args":{"arg1": "value1"}}
+    ],
+    "identifier": "mahimahi",
+    "traits": [],
+    "args:": {"throughput::bytes-per-second": 20000}
+  }
+}

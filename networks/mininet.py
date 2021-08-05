@@ -219,5 +219,11 @@ def SetupMiniNetNetwork(topology:MiniNetTopology, runDaemonServer:bool=False, da
     return MiniNetNetworkModule(networkProcs=[mnProc], nodes=nodes)
 
 
-if __name__ == '__main__':
-    tst = SetupMiniNetNetwork(MiniNetTopology(""))
+class MiniNetNetwork(networks.NetworkSetup):
+
+    def Setup(self, configs:dict) -> (networks.Network, list, float, list):
+
+
+
+
+        return None, None, None, None

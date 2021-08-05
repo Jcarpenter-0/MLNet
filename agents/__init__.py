@@ -1,7 +1,61 @@
 import os
 import datetime
 
+# ======================================
+# Agent Abstractions
+# ======================================
+
+
+class AgentArgs():
+
+    def __init__(self, agentScriptPath
+                 , agentDir='./tmp/'
+                 , agentPort=8080
+                 , training=1
+                 , logPath:str=""
+                 , logFileName:str=None
+                 , miscArgs:dict=dict()):
+        """The collection of arguements to pass to an agent, this is intended as a quick way of formatting args to a agent."""
+
+        self.Agent = agentScriptPath
+        self.Args = dict()
+        self.Args['-agentDir'] = agentDir
+        self.Args['-agentPort'] = agentPort
+        self.Args['-training'] = training
+        self.Args['-logPath'] = logPath
+        self.Args['-logFileName'] = logFileName
+        self.Args.update(miscArgs)
+
+
+
 # Helper functions
+
+def AgentArgs(agentScriptPath
+                 , agentDir='./tmp/'
+                 , agentPort=8080
+                 , training=1
+                 , logPath:str=""
+                 , logFileName:str=None
+                 , miscArgs:dict=dict()) -> dict:
+
+    args = dict()
+
+    args['agent'] = agentScriptPath
+
+    subargs = dict()
+
+    subargs['-agentDir'] = agentDir
+    subargs['-agentPort'] = agentPort
+    subargs['-training'] = training
+    subargs['-logPath'] = logPath
+    subargs['-logFileName'] = logFileName
+    subargs.update(miscArgs)
+
+    args['args'] = subargs
+
+    return args
+
+
 
 
 def DefineSpanningActionSpace(actionFields:dict) -> list:

@@ -22,6 +22,18 @@ import apps.framework_Daemon_server
 # ===================================
 
 
+class NetworkArgs():
+
+    def __init__(self, linkThroughputRange:list, linkLossPercentageRange:list, linkLatencyRange:list, topology:str=None, networkTool:str=None):
+        """General arguements for an network simulator"""
+
+        self.network = networkTool
+        self.throughputRange = linkThroughputRange
+        self.lossPercentageRange = linkLossPercentageRange
+        self.latencyRange = linkLatencyRange
+        self.topology = topology
+
+
 class Node(object):
 
     def __init__(self, ipAddress=None, daemonPort=None, nodeProc=None, inputDir:str=None):
@@ -216,10 +228,16 @@ class Network(object):
         print('Framework: Network Shutdown')
 
 
-# ===================================
-# Network Setup
-# ===================================
+class NetworkSetup(object):
 
+    def __init__(self):
+        """An abstraction for "setting up" a network, regardless of underlying implementation. This is intended for call by the framework.
+        In the future, this should be merged into the Network object, as they cover similar components, but for now aren't logically cohesive.
+        """
+
+    def Setup(self, configs:dict) -> (Network, list, float, list):
+        """Given configs, return a setup network, list of unresolved configs, match degree, list of warnings"""
+        return NotImplementedError
 
 # ====================================
 # Localhost Network Setup API calls
@@ -253,3 +271,18 @@ def SetupLocalHost(daemonServerPort=None, dirOffset='./../../', ipAddress:str='1
 
     return Node(ipAddress=ipAddress, daemonPort=daemonServerPort, nodeProc=opProc, inputDir=inputDir), '127.0.0.1', netifaces.interfaces()[0]
 
+
+class LocalHostNetwork(NetworkSetup):
+
+    def __init__(self):
+        """Module for setting up a localhost network, one node"""
+        super().__init__()
+
+    def Setup(self, configs:dict) -> (Network, list, float, list):
+        network = Network()
+
+        node, ip, iface = SetupLocalHost()
+
+        network.Nodes.append(node)
+
+        return network, [configs.keys()], 0.0, ['The localhost network is non-configurable. It does not run sims on its own.']

@@ -6,6 +6,51 @@ import time
 import numpy as np
 import apps.framework_DMF
 
+# ==================================
+# Application Abstractions
+# ==================================
+
+
+class AppArgs():
+
+    def __init__(self, commandFilePath:str,
+                           targetServerAddress:str=None, targetServerPort:int=None, targetServerPath:str=None,
+                           agentServerAddress:str=None, agentServerPort:int=None,
+                           probingApproach:int=None, probingInterface:str=None, runDuration:int=None,
+                           protocol:str=None, parallelTCPConnections:int=None, logFilePath:str=None, pollRate:float=None,
+                           additionalArgs:dict=None, dirOffset:str='./../../', removeNones:bool=True):
+        """"""
+
+        self.app = dirOffset + commandFilePath
+
+        self.args:dict = dict()
+
+        self.args['-target-server-address'] = targetServerAddress
+        self.args['-target-server-path'] = targetServerPath
+        self.args['-target-server-request-port'] = targetServerPort
+        self.args['-agent-address'] = agentServerAddress
+        self.args['-agent-port'] = agentServerPort
+        self.args['-probing-approach'] = probingApproach
+        self.args['-probing-interface'] = probingInterface
+        self.args['-run-duration-seconds'] = runDuration
+        self.args['-protocol'] = protocol
+        self.args['-parallel-tcp-connections'] = parallelTCPConnections
+        self.args['-logfile-path'] = logFilePath
+
+        if additionalArgs is not None:
+            self.args.update(additionalArgs)
+
+        if removeNones:
+            # remove the "none"s
+            for key in self.args.copy():
+                if self.args[key] is None:
+                    print('Framework: Prepping call: removing {} {}'.format(key, self.args[key]))
+                    del self.args[key]
+
+
+# ==================================
+# Helper functions
+# ==================================
 
 def ToPopenArgs(argDict:dict, replacer:str='~') -> list:
     """Takes the current args, and converts it to a list of commands suitable for a Popen command call. Any args with the key ! instead of - will have only the value passed."""

@@ -140,77 +140,6 @@ class MahiMahiLinkShell(MahiMahiShell):
 
 
 # ====================================
-# Setup API calls
-# ====================================
-
-def SetupMahiMahiNode(mmShellsList:list, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
-    """
-        Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
-    :param mmShellsList:
-    :return generated Node, baseIPaddress, interface for node:
-    """
-
-    mmCommands = []
-
-    for shell in mmShellsList:
-
-        mmCommands.extend(shell.CreateArgsList())
-
-    # Default MahiMahi IP address
-    daemonPort = daemonPort
-
-    ipAddress = None
-
-    if runDaemonServer and len(mmShellsList) <= 1:
-        # Parse the IP address of the created node
-        mmProc = subprocess.Popen(mmCommands,
-                                  stdout=subprocess.PIPE,
-                                  stdin=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT,
-                                  universal_newlines=True)
-
-        output, _ = mmProc.communicate("ifconfig\n")
-
-        ipLineRaw = output.lstrip().split('\n')[1]
-        ipLinePieces = ipLineRaw.split(' ')
-        ipAddress = '{}'.format(ipLinePieces[9])
-
-        # add the operation server command
-        mmCommands.extend(apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
-    else:
-        # create input dir
-        try:
-            os.makedirs(inputDir)
-        except Exception as ex:
-            # erase the existing dirs and remake them
-            print('Framework: Mahimahi Daemon Setup: Exception making input dirs, attempting remake')
-            shutil.rmtree(inputDir)
-            os.makedirs(inputDir)
-
-        # add the proc daemon
-        mmCommands.extend(apps.framework_Daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
-
-    # run actual time to finish
-    finalmmProc = subprocess.Popen(mmCommands,
-                              #stdout=subprocess.PIPE,
-                              stdin=subprocess.PIPE,
-                              #stderr=subprocess.STDOUT,
-                              universal_newlines=True)
-
-    print('Framework: MM Node http://{}:{}/ - Proc {} {}'.format(ipAddress, daemonPort, finalmmProc.pid, finalmmProc.returncode))
-
-    node = networks.Node(ipAddress=ipAddress, nodeProc=finalmmProc, daemonPort=daemonPort, inputDir=inputDir)
-
-    return node, '100.64.0.1', netifaces.interfaces()[-1]
-
-
-def SetupMahiMahiNodeQuick(configs:dict) -> (networks.Node, list, float, list):
-    """Given a set of configurations try to fit as many as possible"""
-
-
-    return None, [], 0.0, []
-
-# ====================================
 # Attendant calls
 # ====================================
 
@@ -353,3 +282,99 @@ def ParseMacroMMLogFileToData(logFilePath:str, timeGrouping:int=0) -> list:
 
     return dataLines
 
+# ====================================
+# Setup API calls
+# ====================================
+
+
+def BuildMahiMahiShell(configs:dict) -> list:
+    """Builds mahimahi shell(s) that fits as close as possible to the given configs"""
+
+
+
+    return
+
+
+def SetupMahiMahiNode(mmShellsList:list, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
+    """
+        Note: If 2 or more shells, IP address is not useful, so Proc must be used, but that also means the operation server cannot run too
+    :param mmShellsList:
+    :return generated Node, baseIPaddress, interface for node:
+    """
+
+    mmCommands = []
+
+    for shell in mmShellsList:
+
+        mmCommands.extend(shell.CreateArgsList())
+
+    # Default MahiMahi IP address
+    daemonPort = daemonPort
+
+    ipAddress = None
+
+    if runDaemonServer and len(mmShellsList) <= 1:
+        # Parse the IP address of the created node
+        mmProc = subprocess.Popen(mmCommands,
+                                  stdout=subprocess.PIPE,
+                                  stdin=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT,
+                                  universal_newlines=True)
+
+        output, _ = mmProc.communicate("ifconfig\n")
+
+        ipLineRaw = output.lstrip().split('\n')[1]
+        ipLinePieces = ipLineRaw.split(' ')
+        ipAddress = '{}'.format(ipLinePieces[9])
+
+        # add the operation server command
+        mmCommands.extend(apps.framework_Daemon_server.PrepareServerArgs(dirOffset=dirOffset, opServerPort=daemonPort))
+    else:
+        # create input dir
+        try:
+            os.makedirs(inputDir)
+        except Exception as ex:
+            # erase the existing dirs and remake them
+            print('Framework: Mahimahi Daemon Setup: Exception making input dirs, attempting remake')
+            shutil.rmtree(inputDir)
+            os.makedirs(inputDir)
+
+        # add the proc daemon
+        mmCommands.extend(apps.framework_Daemon_process.PrepareDaemonArgs(daemonServerWatchFilePath=inputDir, dirOffset=dirOffset))
+
+    # run actual time to finish
+    finalmmProc = subprocess.Popen(mmCommands,
+                              #stdout=subprocess.PIPE,
+                              stdin=subprocess.PIPE,
+                              #stderr=subprocess.STDOUT,
+                              universal_newlines=True)
+
+    print('Framework: MM Node http://{}:{}/ - Proc {} {}'.format(ipAddress, daemonPort, finalmmProc.pid, finalmmProc.returncode))
+
+    node = networks.Node(ipAddress=ipAddress, nodeProc=finalmmProc, daemonPort=daemonPort, inputDir=inputDir)
+
+    return node, '100.64.0.1', netifaces.interfaces()[-1]
+
+
+# ====================================
+# MahiMahi Registry Module
+# ====================================
+
+# some kind of module that sets up a simple two host 1 link mm network, but such that it is callable by a module seeker
+
+class MahiMahiNetwork(networks.NetworkSetup):
+
+    def Setup(self, configs:dict) -> (networks.Network, list, float, list):
+
+        network = networks.Network()
+
+        # build a capable mm-link
+
+
+
+        localhostNode = networks.SetupLocalHost()
+
+        network.Nodes.append(localhostNode)
+        network.Nodes.append()
+
+        return network, [], 0.0, []
