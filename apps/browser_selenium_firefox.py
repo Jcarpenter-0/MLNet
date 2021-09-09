@@ -48,6 +48,13 @@ class SeleniumFirefox(apps.App):
 
         profile.set_preference("dom.disable_beforeunload", True)
 
+        if True:
+            # Disable cache
+            profile.set_preference('browser.cache.disk.enable', False)
+            profile.set_preference('browser.cache.memory.enable', False)
+            profile.set_preference('browser.cache.offline.enable', False)
+            profile.set_preference('network.cookie.cookieBehavior', 2)
+
         fireFoxOptions.headless = True
 
         browser = webdriver.Firefox(options=fireFoxOptions, firefox_profile=profile)
@@ -63,12 +70,10 @@ class SeleniumFirefox(apps.App):
 
         self.__cleannup()
 
-        # Parse the output
-        result = {}
+        # page load time
+        duration = apps.DurationDMF(value=end-start, unit='second', traits=['page-load-time'])
 
-        result['pageLoadTime'] = end-start
-
-        return result
+        return duration.ToDict()
 
 
 if __name__ == '__main__':

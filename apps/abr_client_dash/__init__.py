@@ -21,4 +21,8 @@ def MakeCustomDashClient(abrTargetIP:str, abrServerPort:int, finishedFilePath:st
     finisheddashCodeFP.close()
 
 
+def MakeCustomDashClientHTML(abrAlg:str, dashLib:str, finishedFilePath:str='', htmlPatternPath:str=''):
+    """"""
+    pass
+
 

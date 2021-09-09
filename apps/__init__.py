@@ -112,9 +112,12 @@ def PrepGeneralWrapperCall(commandFilePath:str,
     commandArgs['-protocol'] = protocol
     commandArgs['-parallel-tcp-connections'] = parallelTCPConnections
     commandArgs['-logfile-path'] = logFilePath
+    commandArgs['-poll-rate'] = pollRate
 
     if additionalArgs is not None:
         commandArgs.update(additionalArgs)
+
+    print('Framework: Prepping call: {}'.format(commandFilePath))
 
     if removeNones:
         # remove the "none"s
@@ -366,6 +369,10 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
     dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(maxRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'maximum']).ToDict())
     dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(minRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'minimum']).ToDict())
     dataDict.update(apps.framework_DMF.RoundTripTimeDMF(value=float(np.mean(avgRTTs)), unit='millisecond', traits=['round-trip-time', 'application-level', 'average']).ToDict())
+
+    dataDict.update(apps.framework_DMF.LatencyDMF(value=float(np.mean(maxRTTs))/2, unit='millisecond', traits=['round-trip-time-divided-2', 'application-level', 'maximum']).ToDict())
+    dataDict.update(apps.framework_DMF.LatencyDMF(value=float(np.mean(minRTTs))/2, unit='millisecond', traits=['round-trip-time-divided-2', 'application-level', 'minimum']).ToDict())
+    dataDict.update(apps.framework_DMF.LatencyDMF(value=float(np.mean(avgRTTs))/2, unit='millisecond', traits=['round-trip-time-divided-2', 'application-level', 'average']).ToDict())
 
     dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.max(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'maximum']).ToDict())
     dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=float(np.mean(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'average']).ToDict())

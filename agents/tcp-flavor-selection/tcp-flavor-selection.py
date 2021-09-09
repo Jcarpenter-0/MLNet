@@ -80,7 +80,10 @@ if __name__ == '__main__':
         # training/testing
         mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, len(domainDF.DesiredObservations), len(domainDF.ActionSpace))
     else:
-        mlModule = agents.RepeatModule()
+        if miscArgs is not None:
+            mlModule = agents.RepeatModule(int(miscArgs[-1]))
+        else:
+            mlModule = agents.RepeatModule()
 
     # Declare a server
     server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, (address, port))

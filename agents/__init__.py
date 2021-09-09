@@ -1,5 +1,6 @@
 import os
 import datetime
+import math
 
 # ======================================
 # Agent Abstractions
@@ -54,8 +55,6 @@ def AgentArgs(agentScriptPath
     args['args'] = subargs
 
     return args
-
-
 
 
 def DefineSpanningActionSpace(actionFields:dict) -> list:
@@ -115,8 +114,28 @@ class DomainModule(object):
 
         """
         # Where to write the logging information to
+
         self.LogPath:str = logPath
-        self.LogFileName:str = logFileName
+        self.LogFileName: str = logFileName
+
+        self.ExpandObservationFields:bool = True
+
+        if self.LogPath is None or len(self.LogPath) <= 0:
+            self.LogPath = None
+
+        if self.LogFileName is None or len(self.LogFileName) <= 0:
+            self.LogFileName:str = None
+
+        self.LogFileFullPath: str = ''
+
+        if logPath is not None:
+            self.LogFileFullPath:str = self.LogFileFullPath + self.LogPath
+
+        if logFileName is not None:
+            self.LogFileFullPath: str = self.LogFileFullPath + self.LogFileName
+
+        if len(self.LogFileFullPath) <= 0:
+            self.LogFileFullPath = None
 
         if actionFields is not None:
             # Define default actions case
@@ -146,6 +165,7 @@ class DomainModule(object):
         observation = []
 
         for key in rawObservation.keys():
+            print('{} is {}'.format(key, type(rawObservation[key])))
             if type(rawObservation[key]) != 'str':
                 observation.append(rawObservation[key])
 
@@ -172,26 +192,57 @@ class DomainModule(object):
 
         info = self.DefineInfo(rawObservation)
 
-        if self.LogPath is not None:
+        if self.LogFileFullPath is not None:
             # Open file for appending
             firstLog = True
 
             # ensure paths is present
-            try:
-                os.makedirs(self.LogPath, exist_ok=True)
-            except Exception as ex:
-                print('Agent: Error making directories. {}'.format(ex))
+            if self.LogPath is not None:
+                try:
+                    os.makedirs(self.LogPath, exist_ok=True)
+                except Exception as ex:
+                    print('Agent: Error making directories. {}'.format(ex))
 
-            if os.path.exists(self.LogPath + self.LogFileName):
+            if os.path.exists(self.LogFileFullPath):
                 firstLog = False
 
-            logFileFP = open(self.LogPath + self.LogFileName, 'a')
+            logFileFP = open(self.LogFileFullPath, 'a')
 
             if firstLog:
                 # Write the header
-                logFileFP.write('Timestamp,Raw-Observation,Reward,Done,Info\n'.format())
+                expandedHeader = None
 
-            logFileFP.write('{},\"{}\",{},{},\"{}\"\n'.format(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S"), rawObservation, reward, done, info))
+                if self.ExpandObservationFields:
+                    expandedHeader = ''
+
+                    for metric in rawObservation.keys():
+                        expandedHeader += '{},'.format(metric)
+
+                if expandedHeader is None:
+                    expandedHeader = 'Raw-Observation'
+
+                logFileFP.write('Timestamp,Reward,Done,Info,{}\n'.format(expandedHeader))
+
+            expandedFields = None
+
+            if self.ExpandObservationFields:
+                expandedFields = ''
+
+                for metric in rawObservation.keys():
+
+                    if type(rawObservation[metric]) is str \
+                            or type(rawObservation[metric]) is list \
+                            or type(rawObservation[metric]) is object\
+                            or type(rawObservation[metric]) is dict:
+                        expandedFields += '\"{}\",'.format(rawObservation[metric])
+
+                    else:
+                        expandedFields += '{},'.format(rawObservation[metric])
+
+            if expandedFields is None:
+                expandedFields = '\"{}\"'.format(rawObservation)
+
+            logFileFP.write('{},{},{},\"{}\",{}\n'.format(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S"), reward, done, info, expandedFields))
 
             logFileFP.flush()
             logFileFP.close()
@@ -217,10 +268,45 @@ class LogicModule(object):
 
 class RepeatModule(LogicModule):
 
-    def __init__(self):
-        """Repeat the same actions as defined"""
+    def __init__(self, repeatActionIndex:int=0):
+        """Repeat the same actions as defined, defaulted as the 0th action in the actionspace"""
         super().__init__()
+        self.RepeatActionIndex = repeatActionIndex
 
     def Operate(self, observation, reward, actionSpace, actionSpaceSubset, info) -> int:
-       print("Agent-Logic Module: Selecting Action {}".format(0))
-       return 0
+       print("Agent-Logic Module: Selecting Action {}".format(self.RepeatActionIndex))
+       return self.RepeatActionIndex
+
+
+# =============================================================
+# Common Agent Configs
+# =============================================================
+
+def CoreReward(throughputMbps:float, timeCompletionSeconds:float,
+               allowedBandwidthMbps:int=None, fairnessWeight:float=0.5) -> (float, float):
+    """The basic reward to attempt to distill primary functionality into"""
+
+    tput = throughputMbps
+    ttc = timeCompletionSeconds
+
+    if throughputMbps > timeCompletionSeconds:
+        digitCount = len(str(int(timeCompletionSeconds))) + 1
+
+        # Divide the larger by the smaller's digit count +1
+        tput = throughputMbps/math.pow(10, digitCount)
+    elif timeCompletionSeconds > throughputMbps:
+        digitCount = len(str(int(throughputMbps)))
+
+        # Divide the larger by the smaller's digit count +1
+        ttc = timeCompletionSeconds / math.pow(10, digitCount) + 1
+
+    fairness = 1
+
+    if allowedBandwidthMbps is not None:
+        fairness = 1 - (throughputMbps - allowedBandwidthMbps)/allowedBandwidthMbps
+
+    firstTerm = ((1.0 - fairnessWeight) * (tput) * fairness)
+
+    secondTerm = ((fairnessWeight) * (ttc))
+
+    return (firstTerm - secondTerm), fairness

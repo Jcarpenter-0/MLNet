@@ -44,7 +44,7 @@ class BufferBasedDecisionLogic(agents.LogicModule):
 
 class ABRControllerExperimentModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath):
+    def __init__(self, loggingDirPath, logFileName):
 
         # Hold the history of some inputs
         self.history = dict()
@@ -52,7 +52,7 @@ class ABRControllerExperimentModule(agents.DomainModule):
         # Default initial bitrate index
         self.history['last_bit_rate'] = 0
 
-        super().__init__(loggingDirPath, actionFields={'bitRate':[0,1,2,3,4,5]})
+        super().__init__(logPath=loggingDirPath, logFileName=logFileName, actionSpace=[0,1,2,3,4,5])
 
     def DefineObservation(self, rawObservation:dict) -> list:
         desiredFields = ['lastquality'
@@ -69,7 +69,6 @@ class ABRControllerExperimentModule(agents.DomainModule):
             observation.append(rawObservation[value])
 
         return observation
-
 
     def DefineReward(self, observation, rawObservation):
         """Reward function as outlined by Park and Pensieve: --linear reward-- """
@@ -95,10 +94,10 @@ class ABRControllerExperimentModule(agents.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
+    port, address, mode, learnerDir, loggingPath, logFileName, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath)
+    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath, logFileName)
 
     # Declare a server
     server = agents.framework_AgentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), (address, port))

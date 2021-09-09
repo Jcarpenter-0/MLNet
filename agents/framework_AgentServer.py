@@ -15,8 +15,8 @@ class AgentWrapper(object):
                  , agentDir='./tmp/'
                  , agentPort=8080
                  , training=1
-                 , logPath:str=""
-                 , logFileName:str=None
+                 , logPath:str=''
+                 , logFileName:str=''
                  , miscArgs:list=None):
         """The abstraction of a 'learner' comprised of a ml module, problem definition,
          and a server to host on. Intended to call a learner's setup script in /agents/ and pass some args."""
@@ -45,7 +45,7 @@ class AgentWrapper(object):
             , ''
             , '{}'.format(self.Training)
             , self.LearnerDir
-            , '\"{}\"'.format(self.LogPath)
+            , '{}'.format(self.LogPath)
             , self.LogFileName
         ])
 

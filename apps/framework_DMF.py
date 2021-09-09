@@ -75,6 +75,20 @@ class LossDMF(DescriptiveMetricFormat):
         super().__init__(name="loss", unit=unit, value=value, traits=traits)
 
 
+class CongestionEventDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value=None, traits:list=[]):
+        """Prefab for congestion"""
+        super().__init__(name="congestion-event", unit=unit, value=value, traits=traits)
+
+
+class CongestionFairnessDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value=None, traits:list=[]):
+        """Prefab for congestion fairness"""
+        super().__init__(name="congestion-fairness", unit=unit, value=value, traits=traits)
+
+
 class ThroughputDMF(DescriptiveMetricFormat):
 
     def __init__(self, unit: str, value=None, traits:list=[]):
@@ -87,6 +101,12 @@ class DurationDMF(DescriptiveMetricFormat):
     def __init__(self, unit: str, value=None, traits:list=[]):
         """Prefab for duration"""
         super().__init__(name="duration", unit=unit, value=value, traits=traits)
+
+
+class BandwidthDelayProductDMF(DescriptiveMetricFormat):
+
+    def __init__(self, unit: str, value=None, traits:list=[]):
+        super().__init__(name="bandwidth-delay-product", unit=unit, value=value, traits=traits)
 
 
 class DataSentDMF(DescriptiveMetricFormat):
@@ -404,7 +424,6 @@ def _getMetrics(desiredMetricDMFs:List[DescriptiveMetricFormat], observation:dic
     return resolvedMetrics
 
 
-
 fullConversions = {
     "bit":{"byte":lambda *x : x[0]/8, "kilobit":lambda *x : x[0]/1000, "bits-per-second": lambda *x: x[0]/__resolveDMFConversion(DurationDMF(unit='second'), x[1], x[2], x[3]).Value},
     "kilobit":{"bit":lambda *x : x[0]*1000, "megabit":lambda *x : x[0]/1000},
@@ -432,7 +451,8 @@ fullConversions = {
     "bytes-per-second": {"byte": lambda *x: x[0] * __resolveDMFConversion(DurationDMF(unit='second'), x[1], x[2], x[3]).Value,"kilobytes-per-second": lambda *x: x[0] / 1024},
     "kilobytes-per-second": {"bytes-per-second": lambda *x: x[0] * 1024, "megabytes-per-second": lambda *x: x[0] / 1024},
     "megabytes-per-second": {"kilobytes-per-second": lambda *x: x[0] * 1024,"gigabytes-per-second": lambda *x: x[0] / 1024},
-    "gigabytes-per-second": {"megabits-per-second": lambda *x: x[0] * 1024}
+    "gigabytes-per-second": {"megabits-per-second": lambda *x: x[0] * 1024},
+    "":{"":0}
 }
 
 conversionTree = conversionTree.update(fullConversions)
@@ -492,26 +512,55 @@ class AdaptationModule(agents.DomainModule):
 
         info = self.DefineInfo(observationDMF)
 
-        if self.LogPath is not None:
+        if self.LogFileFullPath is not None:
             # Open file for appending
             firstLog = True
 
             # ensure paths is present
-            try:
-                os.makedirs(self.LogPath, exist_ok=True)
-            except Exception as ex:
-                print('Agent-Server: Error making directories. {}'.format(ex))
+            if self.LogPath is not None:
+                try:
+                    os.makedirs(self.LogPath, exist_ok=True)
+                except Exception as ex:
+                    print('Agent: Error making directories. {}'.format(ex))
 
-            if os.path.exists(self.LogPath + self.LogFileName):
+            if os.path.exists(self.LogFileFullPath):
                 firstLog = False
 
-            logFileFP = open(self.LogPath + self.LogFileName, 'a')
+            logFileFP = open(self.LogFileFullPath, 'a')
 
             if firstLog:
                 # Write the header
-                logFileFP.write('Time-stamp,Raw-Observation,DMF-Observation,Reward,Done,Info\n'.format())
+                expandedHeader = None
 
-            logFileFP.write('{},\"{}\",{},{},{},\"{}\"\n'.format(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S"), rawObservation, observationDMF, reward, done, info))
+                if self.ExpandObservationFields:
+                    expandedHeader = ''
+
+                    for metric in observationDMF.keys():
+                        expandedHeader += '{},'.format(metric)
+
+                if expandedHeader is None:
+                    expandedHeader = 'DMF-Observation'
+
+                logFileFP.write('Timestamp,Reward,Done,Info,{}\n'.format(expandedHeader))
+
+            expandedFields = None
+
+            if self.ExpandObservationFields:
+                expandedFields = ''
+
+                for metric in observationDMF.keys():
+
+                    if type(observationDMF[metric]) is str:
+                        expandedFields += '\"{}\",'.format(observationDMF[metric])
+                    else:
+                        expandedFields += '{},'.format(observationDMF[metric])
+
+            if expandedFields is None:
+                expandedFields = '\"{}\"'.format(observationDMF)
+
+            logFileFP.write(
+                '{},{},{},\"{}\",{}\n'.format(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S"), reward, done, info,
+                                              expandedFields))
 
             logFileFP.flush()
             logFileFP.close()

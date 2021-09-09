@@ -31,8 +31,8 @@ def Cleanup(procs:list, fileInputDir:str, ):
     for proc in procs:
         print('Daemon Process: Proc {} - {}'.format(proc.pid, proc.returncode))
         proc.kill()
-        proc.wait()
         proc.terminate()
+        proc.wait()
         print('Daemon Process: Proc killed')
 
     procs.clear()

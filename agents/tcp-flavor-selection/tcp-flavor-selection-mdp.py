@@ -97,7 +97,10 @@ if __name__ == '__main__':
         # +1 input field, to count the state ID
         mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 11, len(domainDF.ActionSpace))
     else:
-        mlModule = agents.RepeatModule()
+        if miscArgs is not None:
+            mlModule = agents.RepeatModule(int(miscArgs[-1]))
+        else:
+            mlModule = agents.RepeatModule()
 
     # Declare a server
     server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, (address, port))

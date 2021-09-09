@@ -219,6 +219,7 @@ class Network(object):
         for proc in self.NetworkProcs:
             print('Framework: Killing Network Proc {}'.format(proc.pid))
             proc.kill()
+            proc.terminate()
             try:
                 proc.wait(killTimeout)
             except Exception as timeout:
