@@ -60,7 +60,8 @@ class SeleniumFirefox(apps.App):
         browser = webdriver.Firefox(options=fireFoxOptions, firefox_profile=profile)
 
         start = time.time()
-        browser.get('{}:{}{}'.format(args['-target-server-address'], args['-target--server-request-port'], args['-target-server-path']))
+        browser.get('http://{}:{}/{}'.format(args['-target-server-address'], args['-target-server-request-port'],
+                                     args['-target-server-path']))
         end = time.time()
 
         time.sleep(args['-run-duration-seconds'])
@@ -71,7 +72,7 @@ class SeleniumFirefox(apps.App):
         self.__cleannup()
 
         # page load time
-        duration = apps.DurationDMF(value=end-start, unit='second', traits=['page-load-time'])
+        duration = apps.framework_DMF.DurationDMF(value=end-start, unit='second', traits=['page-load-time'])
 
         return duration.ToDict()
 

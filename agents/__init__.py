@@ -31,31 +31,6 @@ class AgentArgs():
 
 # Helper functions
 
-def AgentArgs(agentScriptPath
-                 , agentDir='./tmp/'
-                 , agentPort=8080
-                 , training=1
-                 , logPath:str=""
-                 , logFileName:str=None
-                 , miscArgs:dict=dict()) -> dict:
-
-    args = dict()
-
-    args['agent'] = agentScriptPath
-
-    subargs = dict()
-
-    subargs['-agentDir'] = agentDir
-    subargs['-agentPort'] = agentPort
-    subargs['-training'] = training
-    subargs['-logPath'] = logPath
-    subargs['-logFileName'] = logFileName
-    subargs.update(miscArgs)
-
-    args['args'] = subargs
-
-    return args
-
 
 def DefineSpanningActionSpace(actionFields:dict) -> list:
     """Create a simple span of all possible combinations of a set of action fields.
@@ -166,7 +141,8 @@ class DomainModule(object):
 
         for key in rawObservation.keys():
             print('{} is {}'.format(key, type(rawObservation[key])))
-            if type(rawObservation[key]) != 'str':
+            if str(type(rawObservation[key])) != '<class \'str\'>':
+                print('{} added'.format(rawObservation[key]))
                 observation.append(rawObservation[key])
 
         return observation

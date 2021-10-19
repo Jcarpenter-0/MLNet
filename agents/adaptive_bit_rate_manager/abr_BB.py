@@ -12,6 +12,9 @@ import agents.framework_AgentServer
 M_IN_K = 1000.0
 VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
 
+# number of milliseconds to consider something as "cached" rather than downloaded
+CacheThreshold = 20
+
 
 class BufferBasedDecisionLogic(agents.LogicModule):
 
@@ -44,7 +47,7 @@ class BufferBasedDecisionLogic(agents.LogicModule):
 
 class ABRControllerExperimentModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath, logFileName):
+    def __init__(self, loggingDirPath, logFileName, agentCount:int=None):
 
         # Hold the history of some inputs
         self.history = dict()
@@ -52,9 +55,12 @@ class ABRControllerExperimentModule(agents.DomainModule):
         # Default initial bitrate index
         self.history['last_bit_rate'] = 0
 
+        self.AgentCount = agentCount
+
         super().__init__(logPath=loggingDirPath, logFileName=logFileName, actionSpace=[0,1,2,3,4,5])
 
     def DefineObservation(self, rawObservation:dict) -> list:
+
         desiredFields = ['lastquality'
             ,'buffer'
             ,'bandwidthEst'
@@ -88,18 +94,46 @@ class ABRControllerExperimentModule(agents.DomainModule):
         self.history['last_bit_rate'] = VIDEO_BIT_RATE[rawObservation['lastquality']]
         self.history['last_total_rebuf'] = rawObservation['RebufferTime']
 
+
+        print('Obv: {}'.format(rawObservation))
+        # fairness "violation"
+
+        # DownloadTime in milliseconds
+        downLoadTime = rawObservation['lastChunkFinishTime'] - rawObservation['lastChunkStartTime']
+
+        if downLoadTime <= CacheThreshold:
+            # cached?
+            downLoadTime = -1
+
+        # Chunksize is in bytes
+
+        if self.AgentCount is not None:
+
+            # bandwidth consumed in bits/millisecond
+            bandwidthConsumed = rawObservation['lastChunkSize'] * 8 / downLoadTime
+
+            # bandwidth estimate is in bits/? convert to per millisecond
+            estimatedAllowance = rawObservation['bandwidthEst']/self.AgentCount
+
+            reward, fairness = agents.CoreReward(throughputMbps=bandwidthConsumed/1000, timeCompletionSeconds=downLoadTime/1000,allowedBandwidthMbps=estimatedAllowance/1000, fairnessWeight=0.75)
+
+            rawObservation['chunk-download-time-millisecond'] = downLoadTime
+            rawObservation["bandwidth-consumed-bits-per-millisecond"] = bandwidthConsumed * 1000
+            rawObservation["estimated-bandwidth-allowance-bits-per-millisecond"] = estimatedAllowance
+            rawObservation["fairness"] = fairness
+
         return reward
 
 
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, logFileName, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
+    args = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath, logFileName)
+    domainDF = ABRControllerExperimentModule(args['AgentDir'] + args['LogPath'], args['LogFileName'])
 
     # Declare a server
-    server = agents.framework_AgentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), (address, port))
+    server = agents.framework_AgentServer.AgentServer(domainDF, BufferBasedDecisionLogic(), ('', args['AgentPort']))
 
     server.Run()

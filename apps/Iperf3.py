@@ -33,8 +33,8 @@ class Iperf3App(apps.App):
         if '-tcp-congestion-control' in args.keys():
             translatedActions['-C'] = args['-tcp-congestion-control']
 
-        if '-target-request-port' in args.keys():
-            translatedActions['-p'] = args['-target-request-port']
+        if '-target-server-request-port' in args.keys():
+            translatedActions['-p'] = args['-target-server-request-port']
 
         if '-run-duration-seconds' in args.keys():
             translatedActions['-t'] = args['-run-duration-seconds']

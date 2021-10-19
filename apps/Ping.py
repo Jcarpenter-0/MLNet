@@ -76,7 +76,7 @@ class PingApp(apps.App):
 
         return dataDict
 
-    def Run(self, runArgs:dict) -> dict:
+    def Run(self, runArgs:dict) -> (dict, list):
         cmdArgs = apps.ToPopenArgs(runArgs)
 
         command = ['ping']
@@ -95,7 +95,7 @@ class PingApp(apps.App):
         # Add the action args
         output.update(runArgs)
 
-        return output
+        return output, None
 
 
 # Allow call to just run iperf with initial args

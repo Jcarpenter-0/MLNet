@@ -1,5 +1,5 @@
 import copy
-from typing import List
+from typing import List, Dict
 import apps
 import math
 import agents
@@ -40,13 +40,45 @@ class DescriptiveMetricFormat(object):
 
 def ParseDMF(dmfLabel:str, dmfValue, groupDeliminator:str=":", subDeliminator:str="|") -> DescriptiveMetricFormat:
     """From the DMF serial format, convert to in-process format"""
-    dmfPieces = dmfLabel.split(groupDeliminator)
-    metricName = dmfPieces[0]
-    traits = dmfPieces[1].split(subDeliminator)
-    unit = dmfPieces[2]
+    try:
+        dmfPieces = dmfLabel.split(groupDeliminator)
+        metricName = dmfPieces[0]
+        traits = dmfPieces[1].split(subDeliminator)
+        unit = dmfPieces[2]
 
-    return DescriptiveMetricFormat(metricName, unit, dmfValue, traits)
+        return DescriptiveMetricFormat(metricName, unit, dmfValue, traits)
+    except:
+        print('Error parsing {} into DMF'.format(dmfLabel))
 
+    return None
+
+
+def ParseDMFs(rawDMFs:dict, groupDeliminator:str=":", subDeliminator:str="|") -> Dict[str, DescriptiveMetricFormat]:
+    """From raw DMFs (in text/json), parse into a dict (with the metric top name) of in process format"""
+
+    finalDMFs = {}
+
+    for key in rawDMFs:
+        dmf = ParseDMF(key, rawDMFs[key], groupDeliminator, subDeliminator)
+
+        if dmf is not None:
+            finalDMFs[dmf.Name] = dmf
+
+    return finalDMFs
+
+
+def ParseDMFsList(rawDMFs:dict, groupDeliminator:str=":", subDeliminator:str="|") -> List[DescriptiveMetricFormat]:
+    """From raw DMFs (in text/json), parse into a dict (with the metric top name) of in process format"""
+
+    finalDMFs = []
+
+    for key in rawDMFs:
+        dmf = ParseDMF(key, rawDMFs[key], groupDeliminator, subDeliminator)
+
+        if dmf is not None:
+            finalDMFs.append(dmf)
+
+    return finalDMFs
 
 #========================
 # Some core DMF Metrics
@@ -422,6 +454,28 @@ def _getMetrics(desiredMetricDMFs:List[DescriptiveMetricFormat], observation:dic
             resolvedMetrics.append(resolvedMetric)
 
     return resolvedMetrics
+
+
+def GetMetricFromList(metricName:str, dmfs:list, unit:str=None, metricTraits:list=[], convert=False, matchThreshold:float=0.0) -> DescriptiveMetricFormat:
+
+    comparisonDMF = DescriptiveMetricFormat(metricName, unit=unit, traits=metricTraits)
+
+    matchList = __compareDMFtoDMFs(comparisonDMF, dmfs)
+
+    if len(matchList) > 0:
+
+        if matchList[0][1] >= matchThreshold:
+            return matchList[0][0]
+
+    return None
+
+
+def GetMetric(metricName:str, observation:dict, unit:str=None, metricTraits:list=[], convert=False, matchThreshold:float=0.0) -> DescriptiveMetricFormat:
+    """From a collection of metrics, expressed in unparsed DMF format, find a metric that closely matches desires"""
+
+    dmfs = ParseDMFsList(observation)
+
+    return GetMetricFromList(metricName, dmfs, unit, metricTraits, convert, matchThreshold)
 
 
 fullConversions = {

@@ -1,4 +1,6 @@
 
+# https://wiki.linuxfoundation.org/networking/netem
+
 import networks
 
 

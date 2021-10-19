@@ -9,76 +9,51 @@ import agents
 
 # Abstractions for Agent
 
-class AgentWrapper(object):
+class AgentArgs(object):
 
-    def __init__(self, agentScriptPath
+    def __init__(self
                  , agentDir='./tmp/'
                  , agentPort=8080
                  , training=1
-                 , logPath:str=''
-                 , logFileName:str=''
-                 , miscArgs:list=None):
+                 , logPath:str=""
+                 , logFileName:str=""
+                 , miscArgs:dict=None):
         """The abstraction of a 'learner' comprised of a ml module, problem definition,
          and a server to host on. Intended to call a learner's setup script in /agents/ and pass some args."""
-        self.LearnerScriptPath = agentScriptPath
-        self.LearnerPort = agentPort
-
-        self.LearnerDir = agentDir
+        self.AgentPort = agentPort
+        self.AgentDir = agentDir
         self.Training = training
-
-        self.BaseCommand = ['python3', '{}'.format(self.LearnerScriptPath)]
-
         self.LogPath = logPath
         self.LogFileName = logFileName
         self.MiscArgs = miscArgs
 
-    def ToArgs(self):
-        """
-        :return: a list of cmd line args for use in Popen or cmd
-        """
-        # return as a python list
+    def ToArgs(self) -> dict:
 
-        commandArgs = self.BaseCommand.copy()
+        rawArgs = self.__dict__.copy()
 
-        commandArgs.extend([
-            '{}'.format(self.LearnerPort)
-            , ''
-            , '{}'.format(self.Training)
-            , self.LearnerDir
-            , '{}'.format(self.LogPath)
-            , self.LogFileName
-        ])
+        del rawArgs['MiscArgs']
 
-        if self.MiscArgs is not None:
-            commandArgs.extend(self.MiscArgs)
+        rawArgs.update(self.MiscArgs)
 
-        return commandArgs
+        return rawArgs
 
 
 # Agent Server (Agent implementation)
 
-def ParseDefaultServerArgs() -> (int, str, int, str, str, str, list):
+def ParseDefaultServerArgs() -> dict:
     """Parse the default Agent Server args: port, address, mode, learnerDir, logPath"""
-    print('Agent: Server args: {}'.format(sys.argv))
+    # expects a full json object passed
+    args = json.loads(sys.argv[1])
 
-    port = int(sys.argv[1])
-    learnerAddress = sys.argv[2]
-    mode = int(sys.argv[3])
-    learnerDir = sys.argv[4]
-    logPath = sys.argv[5]
-    logFileName = sys.argv[6]
+    print('Agent: Args {}'.format(args))
 
-    miscArgs = None
-    if len(sys.argv) >= 7:
-        miscArgs = sys.argv[7:]
-
-    # Setup the learnerDir
+    # Setup the agent directory
     try:
-        os.makedirs(learnerDir, exist_ok=True)
+        os.makedirs(args['AgentDir'], exist_ok=True)
     except Exception as ex:
         print('Agent-Server: Error making dirs: {}'.format(ex))
 
-    return port, learnerAddress, mode, learnerDir, logPath, logFileName, miscArgs
+    return args
 
 
 class AgentHttpHandler(http.server.SimpleHTTPRequestHandler):
@@ -129,6 +104,7 @@ class AgentServer(http.server.HTTPServer):
 
         # Indicate that sigterm should call shutdown of the server
         signal.signal(signal.SIGTERM, self.Cleanup)
+        signal.signal(signal.SIGINT, self.Cleanup)
 
         self.DomainModule = domainModule
         self.LogicModule = logicModule
@@ -140,6 +116,7 @@ class AgentServer(http.server.HTTPServer):
 
         # Handle the module's conclusions
         self.LogicModule.Conclude()
+        print('Agent Server: Shuting down')
 
     def Run(self):
 

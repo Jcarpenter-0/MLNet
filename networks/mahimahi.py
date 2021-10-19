@@ -144,12 +144,14 @@ class MahiMahiLinkShell(MahiMahiShell):
 # ====================================
 
 
-def MakeMahiMahiLinkFile(bandwidth:int) -> list:
-    """Make a mahimahi link file for use in the mm-link shell. This code is almost verbatim taken from the Park project by MIT."""
+def MakeMahiMahiLinkFile(bandwidthMbps:int=12) -> list:
+    """Make a mahimahi link file for use in the mm-link shell. This code is almost verbatim taken from the Park project by MIT.
+    Notable that MM can only do a minimum of 12Mbps."""
+
 
     linkLines = []
 
-    lines = bandwidth // 12
+    lines = bandwidthMbps // 12
     for _ in range(lines):
         linkLines.append('1\n')
 
@@ -287,12 +289,40 @@ def ParseMacroMMLogFileToData(logFilePath:str, timeGrouping:int=0) -> list:
 # ====================================
 
 
-def BuildMahiMahiShell(configs:dict) -> list:
-    """Builds mahimahi shell(s) that fits as close as possible to the given configs"""
+def QuickSetupMahiMahiNode(delayMS:int=0, bandwidthMbps:int=None, lossPercentage:float=0.0,
+                           queue:str=None, queueArgs:str=None,
+                           dirOffset='./../',  inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
+    """"""
 
+    mmShells = []
 
+    if delayMS > 0:
+        mmShells.append(MahiMahiDelayShell(delayMS=delayMS))
 
-    return
+    if bandwidthMbps is not None:
+        # Build a temp tput file to use
+        fileData = MakeMahiMahiLinkFile(bandwidthMbps=bandwidthMbps)
+
+        tmpFilePath = './tmp/mm-test-file.mm'
+
+        fp = open(tmpFilePath, 'w')
+
+        fp.writelines(fileData)
+
+        fp.flush()
+        fp.close()
+
+        if queue is not None:
+            mmShells.append(MahiMahiLinkShell(upLinkTraceFilePath=tmpFilePath, downLinkTraceFilePath=tmpFilePath,
+                                              uplinkQueue=queue, uplinkQueueArgs=queueArgs,
+                                              downlinkQueue=queue, downlinkQueueArgs=queueArgs))
+        else:
+            mmShells.append(MahiMahiLinkShell(upLinkTraceFilePath=tmpFilePath, downLinkTraceFilePath=tmpFilePath))
+
+    if lossPercentage > 0.0:
+        mmShells.append(MahiMahiLossShell(lossPercentage=lossPercentage))
+
+    return SetupMahiMahiNode(mmShells, dirOffset=dirOffset, inputDir=inputDir)
 
 
 def SetupMahiMahiNode(mmShellsList:list, runDaemonServer=False, daemonPort=8081, dirOffset='./../', inputDir:str='./daemon-proc-input/mm/') -> Tuple[networks.Node, str, str]:
@@ -369,8 +399,6 @@ class MahiMahiNetwork(networks.NetworkSetup):
         network = networks.Network()
 
         # build a capable mm-link
-
-
 
         localhostNode = networks.SetupLocalHost()
 

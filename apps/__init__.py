@@ -81,11 +81,16 @@ def _prepGeneralWrapperCall(commandFilePath:str, args:dict, dirOffset:str='./../
     basicJson = json.dumps(args)
 
     # add escaped escaped quotes to help the shell digest the json
-    basicJson = basicJson.replace('\"', '\\\"')
+    basicJson = basicJson.replace('\"', '\"')
 
-    commandList.append("\"{}\"".format(basicJson))
+    # \" \" originally
+    commandList.append("{}".format(basicJson))
 
     return commandList
+
+
+def PrepVagueWrapperCall(commandFilePath:str, args:dict, dirOffset:str='./../../') -> list:
+    return _prepGeneralWrapperCall(commandFilePath, args, dirOffset)
 
 
 def PrepGeneralWrapperCall(commandFilePath:str,
@@ -311,7 +316,7 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
 
     dataDict['version'] = startSection['version']
 
-    dataDict.update(apps.framework_DMF.TimeStampDMF(value=startSection['timestamp']['time'], unit='date-time', traits=['application-level','day-of-week, day month-abbreviated year, hour:minute:second GMT']).ToDict())
+    dataDict.update(apps.framework_DMF.TimeStampDMF(value=startSection['timestamp']['time'], unit='date-time', traits=['application-level','day-of-week day month-abbreviated year hour:minute:second GMT']).ToDict())
     dataDict.update(apps.framework_DMF.TimeStampDMF(value=startSection['timestamp']['timesecs'], unit='second', traits=['application-level','epoch-seconds']).ToDict())
     dataDict.update(apps.framework_DMF.TCPMinimumSendSizeDMF(value=startSection['tcp_mss_default'], unit='byte', traits=['application-level', 'default']).ToDict())
     dataDict.update(apps.framework_DMF.ProtocolDMF(value=startSection['test_start']['protocol'], unit='transport-layer', traits=['application-level', 'transport-layer']).ToDict())
@@ -378,7 +383,9 @@ def ParseIperf3Output(rawData: bytes, args: dict) -> dict:
     dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=float(np.mean(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'average']).ToDict())
     dataDict.update(apps.framework_DMF.DescriptiveMetricFormat(name='tcp-send-congestion-window', value=int(np.min(maxSendCWNDs)), unit='congestion-window-unit', traits=['application-level', 'minimum']).ToDict())
 
-    dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
+    dataDict.update(args)
+
+    #dataDict['system_info'] = "\"{}\"".format(startSection['system_info'])
 
     return dataDict
 
@@ -442,7 +449,7 @@ def RunApplication(application:App, runCount:int=10000):
             commands, gaps = application.TranslateActions(args)
             result, warnings = application.Run(commands)
 
-            result.update(args)
+            #result.update(args)
 
             if gaps is not None and len(gaps) > 0:
                 print('Application: Translation Gaps: {}'.format(gaps))
@@ -530,3 +537,35 @@ def RunApplication(application:App, runCount:int=10000):
             elif fullFailure:
                 currentRunNum = runCount
                 raise Exception('Closed')
+
+# ======================================================================
+# Common App Configs
+# ======================================================================
+
+
+def CoreObservation() -> dict:
+    """"""
+
+    # Bandwidth
+
+    # TimeComponent (Delay, RTT, duration, etc)
+
+    # Number of Agents
+
+    # Time of Day
+
+    # Time of Week
+
+    # Time of Month
+
+    # LossComponent (Lost packets, retransmits, missing data)
+
+    # Size component (* * * *)
+
+    # Src to Trg hop count
+
+    # Protocol ID (index differentiating protocol)
+
+    # Target address (as an index to differentiate the IPs)
+
+    return {}

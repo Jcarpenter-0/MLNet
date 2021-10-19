@@ -13,7 +13,6 @@ import agents.kerasMLs
 # Some constants from Park and Pensieve's reward functions
 M_IN_K = 1000.0
 VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
-AgentCount = 1
 LinkQuality = 12000000
 # number of milliseconds to consider something as "cached" rather than downloaded
 CacheThreshold = 20
@@ -21,7 +20,8 @@ CacheThreshold = 20
 
 class ABRControllerExperimentModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath):
+    def __init__(self, loggingDirPath, logFileName, agentCount:int=None):
+        self.AgentCount = agentCount
         super().__init__(logPath=loggingDirPath, logFileName=logFileName, actionSpace=[0,1,2,3,4,5])
 
     def DefineObservation(self, rawObservation:dict) -> list:
@@ -58,14 +58,15 @@ class ABRControllerExperimentModule(agents.DomainModule):
         # Chunksize is in bytes
 
         # bandwidth estimate is in bits/? convert to per millisecond
-        estimatedAllowance = rawObservation['bandwidthEst']/AgentCount
+        estimatedAllowance = rawObservation['bandwidthEst']/self.AgentCount
 
-        reward, unfairness = agents.CoreReward(throughputMbps=bandwidthConsumed/1000, timeCompletionSeconds=downLoadTime/1000,allowedBandwidthMbps=estimatedAllowance/1000)
+        reward, fairness = agents.CoreReward(throughputMbps=bandwidthConsumed/1000, timeCompletionSeconds=downLoadTime/1000,allowedBandwidthMbps=estimatedAllowance/1000
+                                             , fairnessWeight=0.75)
 
         rawObservation['chunk-download-time-millisecond'] = downLoadTime
-        rawObservation["bandwidth-consumed-bits-per-millisecond"] = bandwidthConsumed
+        rawObservation["bandwidth-consumed-bits-per-millisecond"] = bandwidthConsumed * 1000
         rawObservation["estimated-bandwidth-allowance-bits-per-millisecond"] = estimatedAllowance
-        rawObservation["fairness"] = unfairness
+        rawObservation["fairness"] = fairness
 
         return reward
 
@@ -73,20 +74,20 @@ class ABRControllerExperimentModule(agents.DomainModule):
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, logFileName, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
+    args = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(learnerDir + loggingPath)
+    domainDF = ABRControllerExperimentModule(args['AgentDir'] + args['LogPath'], args['LogFileName'])
 
     # Depending on mode
-    if mode == 1 or mode == 0:
+    if args['Training'] == 1 or args['Training'] == 0:
         # training/testing
-        mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 7, len(domainDF.ActionSpace))
+        mlModule = agents.kerasMLs.kerasActorCritic(args['AgentDir'], 7, len(domainDF.ActionSpace))
     else:
 
         mlModule = agents.RepeatModule()
 
     # Declare a server
-    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, (address, port))
+    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, ('', args['AgentPort']))
 
     server.Run()

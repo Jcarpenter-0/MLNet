@@ -8,19 +8,34 @@ import numpy as np
 import agents
 import agents.framework_AgentServer
 import agents.kerasMLs
-
+import mdp as mdplib
 
 # Some constants from Park and Pensieve's reward functions
 M_IN_K = 1000.0
 VIDEO_BIT_RATE = [300,750,1200,1850,2850,4300]  # Kbps
 AgentCount = 1
+LinkQuality = 12000000
 # number of milliseconds to consider something as "cached" rather than downloaded
 CacheThreshold = 20
 
 
-class ABRControllerExperimentModule(agents.DomainModule):
+class ABRControllerExperimentModule(mdplib.PartialMDPModule):
 
     def __init__(self, loggingDirPath, logFileName, agentCount:int=None):
+
+        self.AgentCount = agentCount
+
+        # Defining the MDP
+        mdp = []
+
+        # "lower" performance state 0
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) <= 16.5], [0]))
+
+        # "ambiguous" performance state 1
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 16.5 and self.DefineReward(a, a) <= 19], [2,3,4,5]))
+
+        # "high end" performance state 2
+        mdp.append(mdplib.State([lambda a: self.DefineReward(a, a) > 19], [4,5]))
 
         # Hold the history of some inputs
         self.history = dict()
@@ -28,7 +43,7 @@ class ABRControllerExperimentModule(agents.DomainModule):
         # Default initial bitrate index
         self.history['last_bit_rate'] = 0
 
-        super().__init__(logPath=loggingDirPath, logFileName=logFileName, actionSpace=[0,1,2,3,4,5])
+        super().__init__(mdp=mdp, logPath=loggingDirPath, logFileName=logFileName, actionSpace=[0,1,2,3,4,5])
 
     def DefineObservation(self, rawObservation:dict) -> list:
 
@@ -76,19 +91,21 @@ class ABRControllerExperimentModule(agents.DomainModule):
 
         # Chunksize is in bytes
 
-        # bandwidth consumed in bits/millisecond
-        bandwidthConsumed = rawObservation['lastChunkSize'] * 8 / downLoadTime
+        if self.AgentCount is not None:
 
-        # bandwidth estimate is in bits/? convert to per millisecond
-        estimatedAllowance = rawObservation['bandwidthEst']/AgentCount
+            # bandwidth consumed in bits/millisecond
+            bandwidthConsumed = rawObservation['lastChunkSize'] * 8 / downLoadTime
 
-        evalReward, fairness = agents.CoreReward(throughputMbps=bandwidthConsumed/1000, timeCompletionSeconds=downLoadTime/1000,allowedBandwidthMbps=estimatedAllowance/1000,fairnessWeight=0.75)
+            # bandwidth estimate is in bits/? convert to per millisecond
+            estimatedAllowance = rawObservation['bandwidthEst']/self.AgentCount
 
-        rawObservation['chunk-download-time-millisecond'] = downLoadTime
-        rawObservation["bandwidth-consumed-bits-per-millisecond"] = bandwidthConsumed * 1000
-        rawObservation["estimated-bandwidth-allowance-bits-per-millisecond"] = estimatedAllowance
-        rawObservation["fairness"] = fairness
-        rawObservation["eval-reward"] = evalReward
+            evalReward, fairness = agents.CoreReward(throughputMbps=bandwidthConsumed/1000, timeCompletionSeconds=downLoadTime/1000,allowedBandwidthMbps=estimatedAllowance/1000,fairnessWeight=0.75)
+
+            rawObservation['chunk-download-time-millisecond'] = downLoadTime
+            rawObservation["bandwidth-consumed-bits-per-millisecond"] = bandwidthConsumed * 1000
+            rawObservation["estimated-bandwidth-allowance-bits-per-millisecond"] = estimatedAllowance
+            rawObservation["fairness"] = fairness
+            rawObservation["eval-reward"] = evalReward
 
         return reward
 
@@ -99,7 +116,10 @@ if __name__ == '__main__':
     args = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = ABRControllerExperimentModule(args['AgentDir'] + args['LogPath'], args['LogFileName'])
+    if 'AgentCount' in args:
+        domainDF = ABRControllerExperimentModule(args['AgentDir'] + args['LogPath'], args['LogFileName'], args['AgentCount'])
+    else:
+        domainDF = ABRControllerExperimentModule(args['AgentDir'] + args['LogPath'], args['LogFileName'])
 
     # Depending on mode
     if args['Training'] == 1 or args['Training'] == 0:

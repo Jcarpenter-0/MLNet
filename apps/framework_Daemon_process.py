@@ -4,9 +4,11 @@ import os
 import sys
 import time
 import glob
+import signal
 import shutil
 
 # intended for use by network sims that are not necessarily reachable for the daemon server
+# https://stackoverflow.com/questions/18499497/how-to-process-sigterm-signal-gracefully
 
 def PrepareDaemonCLI(daemonServerWatchFilePath:str, dirOffset='./', batchRate:float=0.75)->str:
     return 'python3 {}apps/framework_Daemon_process.py {} {}'.format(dirOffset, daemonServerWatchFilePath, batchRate)
@@ -29,11 +31,10 @@ def PrepareDaemonArgs(daemonServerWatchFilePath:str, dirOffset='./', batchRate:f
 def Cleanup(procs:list, fileInputDir:str, ):
     print('Daemon Process: Stopping {} Procs'.format(len(procs)))
     for proc in procs:
-        print('Daemon Process: Proc {} - {}'.format(proc.pid, proc.returncode))
-        proc.kill()
         proc.terminate()
+        proc.kill()
         proc.wait()
-        print('Daemon Process: Proc killed')
+        print('Daemon Process: Proc {} - {} - {}'.format(proc.pid, proc.returncode, proc.args))
 
     procs.clear()
 
@@ -48,6 +49,10 @@ def Cleanup(procs:list, fileInputDir:str, ):
         inputFPEraser.flush()
         inputFPEraser.close()
 
+
+def test():
+
+    print('TERM TEST')
 
 if __name__ == '__main__':
 
@@ -64,6 +69,9 @@ if __name__ == '__main__':
     try:
 
         print('Node {}: Daemon Process: Going up: {} - {}'.format(nodeID, os.getcwd(), sys.argv))
+
+        signal.signal(signal.SIGINT, test)
+        signal.signal(signal.SIGTERM, test)
 
         while(run):
 
@@ -104,11 +112,12 @@ if __name__ == '__main__':
                             # Its in Json, extract out the cmd args at start
                             firstJsonBrack = command.index('{')
 
-                            newCommand = command[:firstJsonBrack] + command[firstJsonBrack:].replace(': ', ':').replace(', ', ',')
+                            commandPieces = command[:firstJsonBrack].split(' ')
 
-                            daemonSubprocesses.append(subprocess.Popen(newCommand, shell=True))
+                            #jsonBody = json.loads(command[firstJsonBrack:])
 
-                            command = newCommand
+                            # shell=true originally
+                            daemonSubprocesses.append(subprocess.Popen([commandPieces[0], commandPieces[1], command[firstJsonBrack:]]))
 
                         newProc = daemonSubprocesses[-1]
                         print('Node {}: Daemon Process: New Command {} - {} - {}'.format(nodeID, command, newProc.pid, newProc.returncode))
@@ -123,6 +132,4 @@ if __name__ == '__main__':
     except Exception as ex:
         print(ex)
     finally:
-        print('Node {}: Daemon Process: Being killed'.format(nodeID))
         Cleanup(daemonSubprocesses, fileInputDir)
-        print('Node {}: Daemon Process: Clean Up'.format(nodeID))

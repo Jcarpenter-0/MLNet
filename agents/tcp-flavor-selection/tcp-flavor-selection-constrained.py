@@ -10,9 +10,13 @@ import agents.framework_AgentServer
 import agents.kerasMLs
 
 
-class CongestionControlExperimentProblemModule(apps.framework_DMF.AdaptationModule):
+class CongestionControlExperimentProblemModule(agents.DomainModule):
 
-    def __init__(self, loggingDirPath, logFileName):
+    def __init__(self, loggingDirPath, logFileName, agentCount:int=1, linkQuality:int=0):
+
+        # for experimental checks
+        self.LinkQuality = linkQuality
+        self.AgentCount = agentCount
 
         actionSpace = []
 
@@ -23,32 +27,20 @@ class CongestionControlExperimentProblemModule(apps.framework_DMF.AdaptationModu
         actionSpace.append({'-tcp-congestion-control': 'bic'})
         actionSpace.append({'-tcp-congestion-control': 'htcp'})
 
-        desiredObservationMetrics = []
+        super().__init__(logPath=loggingDirPath, logFileName=logFileName, actionSpace=actionSpace)
 
-        desiredObservationMetrics.append(apps.framework_DMF.LossDMF(unit='byte'))
-        desiredObservationMetrics.append(apps.framework_DMF.DurationDMF(unit='second'))
-        desiredObservationMetrics.append(apps.framework_DMF.LatencyDMF(unit='millisecond'))
-        desiredObservationMetrics.append(apps.framework_DMF.RoundTripTimeDMF(unit='millisecond', traits=['min']))
-        desiredObservationMetrics.append(apps.framework_DMF.RoundTripTimeDMF(unit='millisecond', traits=['mean']))
-        desiredObservationMetrics.append(apps.framework_DMF.ThroughputDMF(unit='byte'))
-        desiredObservationMetrics.append(apps.framework_DMF.ParallelStreamsDMF(unit='tcp-stream'))
-        desiredObservationMetrics.append(apps.framework_DMF.DataSentDMF(unit='byte'))
-
-        super().__init__(logPath=loggingDirPath, logFileName=logFileName, desiredObservationMetrics=desiredObservationMetrics, actionSpace=actionSpace)
-
-    def DefineReward(self, observation, rawObservation):
+    def DefineReward(self, rawObservation, observation):
         # Copa style reward = log(throughput) - log(delay)/2 - log(lost packets)
 
         # goodput (stated in copa paper, backed by ccp code, backed by park code)
-        throughput = float(rawObservation[self.DesiredObservations[5].GetDMFLabel()])
+        throughput = float(apps.framework_DMF.GetMetric('throughput', rawObservation).Value)
 
         # delay in ms (iperf gives it in usecs, backed in park, and backed in ccp codes)
-        delay = ((float(rawObservation[self.DesiredObservations[3].GetDMFLabel()]) - float(rawObservation[self.DesiredObservations[4].GetDMFLabel()]))/1000)
+        delay = ((float(apps.framework_DMF.GetMetric('round-trip-time', rawObservation, metricTraits=['maximum']).Value) - float(apps.framework_DMF.GetMetric('round-trip-time', rawObservation, metricTraits=['minimum']).Value))/1000)
 
         # TCP retransmits seem too low for it to make sense
-        lostPackets = int(rawObservation[rawObservation[self.DesiredObservations[0].GetDMFLabel()]])
+        lostPackets = int(apps.framework_DMF.GetMetric('loss', rawObservation).Value)
 
-        # TCP retransmits
         reward = 0
 
         if throughput > 0:
@@ -60,28 +52,39 @@ class CongestionControlExperimentProblemModule(apps.framework_DMF.AdaptationModu
         if lostPackets > 0:
             reward = reward - math.log2(lostPackets)
 
+        sideReward, fairness = agents.CoreReward(throughputMbps=apps.framework_DMF.GetMetric('throughput', rawObservation).Value/1000/1000,
+                                             timeCompletionSeconds=apps.framework_DMF.GetMetric('round-trip-time', rawObservation).Value/1000,
+                                             allowedBandwidthMbps=self.LinkQuality/self.AgentCount,
+                                             fairnessWeight=0.5)
+
+        rawObservation["fairness"] = fairness
+        rawObservation["allowed"] = self.LinkQuality/self.AgentCount
+
         return reward
 
 
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, logFileName, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
+    args = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = CongestionControlExperimentProblemModule(learnerDir + loggingPath, logFileName)
+    if 'agentCount' in args.keys():
+        domainDF = CongestionControlExperimentProblemModule(args['AgentDir'] + args['LogPath'], args['LogFileName'], agentCount=args['agentCount'], linkQuality=args['linkQuality'])
+    else:
+        domainDF = CongestionControlExperimentProblemModule(args['AgentDir'] + args['LogPath'], args['LogFileName'])
 
     # Depending on mode
-    if mode == 1 or mode == 0:
+    if args['Training'] == 1 or args['Training'] == 0:
         # training/testing
-        mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 10, len(domainDF.ActionSpace))
+        mlModule = agents.kerasMLs.kerasActorCritic(args['AgentDir'], 27, len(domainDF.ActionSpace))
     else:
-        if miscArgs is not None:
-            mlModule = agents.RepeatModule(int(miscArgs[-1]))
+        if 'actionIndex' in args.keys():
+            mlModule = agents.RepeatModule(int(args['actionIndex']))
         else:
             mlModule = agents.RepeatModule()
 
     # Declare a server
-    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, (address, port))
+    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, ('', args['AgentPort']))
 
     server.Run()

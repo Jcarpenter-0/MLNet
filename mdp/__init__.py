@@ -3,6 +3,7 @@ import numpy
 
 # https://ai.stackexchange.com/questions/5051/rl-agents-view-of-state-transitions
 # https://ai.stackexchange.com/questions/7763/how-to-define-states-in-reinforcement-learning
+import agents
 
 
 class State(object):
@@ -60,17 +61,14 @@ def AnalyzeObservation(observation:dict, possibleStates:list):
             return state, idx
 
 
-import apps.framework_DMF
+class PartialMDPModule(agents.DomainModule):
 
-
-class PartialMDPModule(apps.framework_DMF.AdaptationModule):
-
-    def __init__(self, mdp:list, desiredObservationMetrics:list, logPath:str=None, logFileName:str=None, actionSpace:list=None, actionFields:dict=None):
+    def __init__(self, mdp:list, logPath:str=None, logFileName:str=None, actionSpace:list=None, actionFields:dict=None):
         """Partial-defined Markovian Decision Process system"""
-        super().__init__(desiredObservationMetrics=desiredObservationMetrics, logPath=logPath, logFileName=logFileName, actionSpace=actionSpace, actionFields=actionFields)
+        super().__init__(logPath=logPath, logFileName=logFileName, actionSpace=actionSpace, actionFields=actionFields)
         self.MDP = mdp
 
-    def DefineActionSpaceSubset(self, rawObservation:dict, observation:dict) -> list:
+    def DefineActionSpaceSubset(self, rawObservation:dict, observation:list) -> list:
         """Action space is defined by what state the system is currently in"""
 
         # Get current State
@@ -86,9 +84,9 @@ class PartialMDPModule(apps.framework_DMF.AdaptationModule):
 
         rawObservation['StateID'] = id
 
-        # Add to the observation, state id
-        newObv = super().DefineObservation(rawObservation)
+        adjustedObv = currentState.AdjustMetrics(rawObservation)
 
-        newObv = currentState.AdjustMetrics(newObv)
+        # Add to the observation, state id
+        newObv = super().DefineObservation(adjustedObv)
 
         return newObv

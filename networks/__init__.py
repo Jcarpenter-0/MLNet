@@ -60,7 +60,7 @@ class Node(object):
 
         self.Applications.append(appArgsCopy)
 
-    def StartApplications(self, interApplicationDelay=3):
+    def StartApplications(self, interApplicationDelay=1.5):
         """Start the applications on the node"""
 
         for applicationArgs in self.Applications:
@@ -139,7 +139,7 @@ class Node(object):
 
                 print('Framework: Application Stop to {}'.format(inputFilePath))
                 # basic read delay
-                time.sleep(2)
+                time.sleep(1.25)
 
         except Exception as ex:
             print(ex)
@@ -149,32 +149,28 @@ class Node(object):
         self.StopApplications()
 
         if self.NodeProc is not None:
-            try:
-                if self.InputDir is not None:
-                    # write the daemon Proc exit command
-                    inputFilePath = self.InputDir + 'input.txt'
+            if self.InputDir is not None:
+                # write the daemon Proc exit command
+                inputFilePath = self.InputDir + 'input.txt'
 
-                    print('Framework: Node Shutdown to {}'.format(inputFilePath))
+                print('Framework: Node Shutdown to {}'.format(inputFilePath))
 
-                    cmdLine = 'EXIT\n'
+                cmdLine = 'EXIT\n'
 
-                    inputFP = open(inputFilePath, 'w')
+                inputFP = open(inputFilePath, 'w')
 
-                    inputFP.write('{}'.format(cmdLine))
+                inputFP.write('{}'.format(cmdLine))
 
-                    inputFP.flush()
-                    inputFP.close()
+                inputFP.flush()
+                inputFP.close()
 
-                    # Read delay
-                    time.sleep(2)
+                # Read delay
+                time.sleep(1.25)
 
-                self.NodeProc.kill()
-                self.NodeProc.wait(killTimeout)
-            except Exception as timeout:
-                self.NodeProc.kill()
-                self.NodeProc.wait()
+            self.NodeProc.kill()
+            self.NodeProc.wait()
+            print('Framework: Killing Network Node Proc {} - {} - {} - {}'.format(self.IpAddress, self.NodeProc.pid, self.NodeProc.returncode, self.NodeProc.args))
 
-            print('Framework: Node {} proc {} - {} shutdown'.format(self.IpAddress, self.NodeProc.pid, self.NodeProc.returncode))
         else:
             print('Framework: Node {} has no proc, but is called to shutdown'.format(self.IpAddress))
 
@@ -195,7 +191,7 @@ class Network(object):
         # List of Node objects (real or simulated)
         self.Nodes:list = nodes
 
-    def StartNodes(self, interNodeDelay=0, interApplicationDelay=2):
+    def StartNodes(self, interNodeDelay=2, interApplicationDelay=2):
         """Start all the nodes's applications"""
 
         for node in self.Nodes:
@@ -208,25 +204,19 @@ class Network(object):
             node.StopApplications()
             time.sleep(interNodeDelay)
 
-    def Shutdown(self, killTimeout=2):
+    def Shutdown(self):
         """Shutdown all the processes on the nodes, and the network itself"""
 
         # Shutdown each node
         for node in self.Nodes:
-            node.ShutdownNode(killTimeout)
+            node.ShutdownNode()
 
         # iterate over network procs to shut them down
         for proc in self.NetworkProcs:
-            print('Framework: Killing Network Proc {}'.format(proc.pid))
             proc.kill()
             proc.terminate()
-            try:
-                proc.wait(killTimeout)
-            except Exception as timeout:
-                proc.kill()
-                proc.wait()
-
-        print('Framework: Network Shutdown')
+            proc.wait()
+            print('Framework: Killing Network Proc {} - {} - {}'.format(proc.pid, proc.returncode, proc.args))
 
 
 class NetworkSetup(object):

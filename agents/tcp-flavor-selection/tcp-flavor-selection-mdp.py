@@ -14,7 +14,11 @@ import mdp as mdplib
 
 class CongestionControlExperimentProblemModulePartial(mdplib.PartialMDPModule):
 
-    def __init__(self, loggingDirPath, logFileName):
+    def __init__(self, loggingDirPath, logFileName, agentCount:int=1, linkQuality:int=0):
+
+        # for experimental checks
+        self.LinkQuality = linkQuality
+        self.AgentCount = agentCount
 
         actionSpace = []
 
@@ -28,17 +32,6 @@ class CongestionControlExperimentProblemModulePartial(mdplib.PartialMDPModule):
         actionSpace.append({'-tcp-congestion-control': 'lp'})
         actionSpace.append({'-tcp-congestion-control': 'veno'})
         actionSpace.append({'-tcp-congestion-control': 'westwood'})
-
-        desiredObservationMetrics = []
-
-        desiredObservationMetrics.append(apps.framework_DMF.LossDMF(unit='byte'))
-        desiredObservationMetrics.append(apps.framework_DMF.DurationDMF(unit='second'))
-        desiredObservationMetrics.append(apps.framework_DMF.LatencyDMF(unit='millisecond'))
-        desiredObservationMetrics.append(apps.framework_DMF.RoundTripTimeDMF(unit='millisecond', traits=['min']))
-        desiredObservationMetrics.append(apps.framework_DMF.RoundTripTimeDMF(unit='millisecond', traits=['mean']))
-        desiredObservationMetrics.append(apps.framework_DMF.ThroughputDMF(unit='byte'))
-        desiredObservationMetrics.append(apps.framework_DMF.ParallelStreamsDMF(unit='tcp-stream'))
-        desiredObservationMetrics.append(apps.framework_DMF.DataSentDMF(unit='byte'))
 
         # Defining the MDP
         mdp = []
@@ -59,13 +52,13 @@ class CongestionControlExperimentProblemModulePartial(mdplib.PartialMDPModule):
         # Copa style reward = log(throughput) - log(delay)/2 - log(lost packets)
 
         # goodput (stated in copa paper, backed by ccp code, backed by park code)
-        throughput = float(rawObservation[self.DesiredObservations[5].GetDMFLabel()])
+        throughput = float(apps.framework_DMF.GetMetric('throughput', rawObservation).Value)
 
         # delay in ms (iperf gives it in usecs, backed in park, and backed in ccp codes)
-        delay = ((float(rawObservation[self.DesiredObservations[3].GetDMFLabel()]) - float(rawObservation[self.DesiredObservations[4].GetDMFLabel()]))/1000)
+        delay = ((float(apps.framework_DMF.GetMetric('round-trip-time', rawObservation, metricTraits=['maximum']).Value) - float(apps.framework_DMF.GetMetric('round-trip-time', rawObservation, metricTraits=['minimum']).Value))/1000)
 
         # TCP retransmits seem too low for it to make sense
-        lostPackets = int(rawObservation[rawObservation[self.DesiredObservations[0].GetDMFLabel()]])
+        lostPackets = int(apps.framework_DMF.GetMetric('loss', rawObservation).Value)
 
         # TCP retransmits
         reward = 0
@@ -79,30 +72,40 @@ class CongestionControlExperimentProblemModulePartial(mdplib.PartialMDPModule):
         if lostPackets > 0:
             reward = reward - math.log2(lostPackets)
 
+        #
+        sideReward, fairness = agents.CoreReward(throughputMbps=apps.framework_DMF.GetMetric('throughput', rawObservation).Value/1000/1000,
+                                             timeCompletionSeconds=apps.framework_DMF.GetMetric('round-trip-time', rawObservation).Value/1000,
+                                             allowedBandwidthMbps=self.LinkQuality/self.AgentCount,
+                                             fairnessWeight=0.5)
+
+        rawObservation["fairness"] = fairness
+        rawObservation["allowed"] = self.LinkQuality/self.AgentCount
+
         return reward
 
 
 if __name__ == '__main__':
 
     # Parse the default args
-    port, address, mode, learnerDir, loggingPath, logFileName, miscArgs = agents.framework_AgentServer.ParseDefaultServerArgs()
+    args = agents.framework_AgentServer.ParseDefaultServerArgs()
 
     # Setup domain definition
-    domainDF = CongestionControlExperimentProblemModulePartial(learnerDir + loggingPath, logFileName)
+    if 'agentCount' in args.keys():
+        domainDF = CongestionControlExperimentProblemModulePartial(args['AgentDir'] + args['LogPath'], args['LogFileName'], agentCount=args['agentCount'], linkQuality=args['linkQuality'])
+    else:
+        domainDF = CongestionControlExperimentProblemModulePartial(args['AgentDir'] + args['LogPath'], args['LogFileName'])
 
     # Depending on mode
-    if mode == 1 or mode == 0:
+    if args['Training'] == 1 or args['Training'] == 0:
         # training/testing
-
-        # +1 input field, to count the state ID
-        mlModule = agents.kerasMLs.kerasActorCritic(learnerDir, 11, len(domainDF.ActionSpace))
+        mlModule = agents.kerasMLs.kerasActorCritic(args['AgentDir'], 27, len(domainDF.ActionSpace))
     else:
-        if miscArgs is not None:
-            mlModule = agents.RepeatModule(int(miscArgs[-1]))
+        if 'actionIndex' in args.keys():
+            mlModule = agents.RepeatModule(int(args['actionIndex']))
         else:
             mlModule = agents.RepeatModule()
 
     # Declare a server
-    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, (address, port))
+    server = agents.framework_AgentServer.AgentServer(domainDF, mlModule, ('', args['AgentPort']))
 
     server.Run()
